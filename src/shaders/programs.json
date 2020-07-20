@@ -1,0 +1,9 @@
+{
+	"custom_water": {
+		"description": "Render underwater scene.",
+		"shaders": {
+			"vertex": "water.vert",
+			"fragment": "water.frag"
+		}
+	}
+}
