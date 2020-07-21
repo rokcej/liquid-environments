@@ -1,4 +1,5 @@
-import * as RC from '/rendercore/src/RenderCore.js'
+import * as RC from "/rendercore/src/RenderCore.js"
+import { ParticleManager } from "./particle_manager.js";
 
 /** 
  * TODO:
@@ -7,6 +8,7 @@ import * as RC from '/rendercore/src/RenderCore.js'
  * -Canvas resize
  */
 
+let x = new ParticleManager();
 class App {
 	constructor(canvas) {
 		// Canvas
@@ -52,16 +54,20 @@ class App {
 		this.cameraManager.activeCamera = this.camera;
 
 		// Lights
-		this.dLight = new RC.DirectionalLight(new RC.Color("#FFFFFF"), 1.0);
-		this.dLight.position = new RC.Vector3(1.0, 0.5, 0.8);
+		//this.dLight = new RC.DirectionalLight(new RC.Color("#FFFFFF"), 1.0);
+		//this.dLight.position = new RC.Vector3(1.0, 0.5, 0.8);
 		this.pLight = new RC.PointLight(new RC.Color("#FFFFFF"), 1.0);
 		this.pLight.position = new RC.Vector3(-4.0, 10.0, -20.0);
+		this.pLight2 = new RC.PointLight(new RC.Color("#FFFFFF"), 1.0);
+		this.pLight2.position = new RC.Vector3(10.0, 10.0, 10.0);
 		this.aLight = new RC.AmbientLight(new RC.Color("#FFFFFF"), 0.05);
 
-        this.pLight.add(new RC.Cube(1.0, this.pLight.color));
+		this.pLight.add(new RC.Cube(1.0, this.pLight.color));
+		this.pLight2.add(new RC.Cube(1.0, this.pLight.color));
 
-		this.scene.add(this.dLight);
+		///this.scene.add(this.dLight);
 		this.scene.add(this.pLight);
+		this.scene.add(this.pLight2);
 		this.scene.add(this.aLight);
 
 		// Plane
@@ -74,6 +80,9 @@ class App {
 		plane.translateY(-4);
 		plane.rotateX(Math.PI * 0.5);
 		this.scene.add(plane);
+
+		// Particles
+		this.particleManager = new ParticleManager(this.scene, this.camera, 200, 0.004, 5, 100);
 
 		/// Post production scene
 		let waterShaderMaterial = new RC.CustomShaderMaterial("water");
@@ -162,7 +171,6 @@ class App {
 
 						const colorCode = colors[Math.floor(Math.random() * colors.length)];
 						clone.material.color = new RC.Color(colorCode);
-						console.log(colorCode);
 						clone.material.specular = new RC.Color("#444444");
 						clone.material.shininess = 8;
 						this.scene.add(clone);
@@ -177,13 +185,13 @@ class App {
 	update() {
 		// Timer
 		this.timer.prev = this.timer.curr;
-		this.timer.curr = performance.now();
+		this.timer.curr = performance.now() * 0.001;
 		this.timer.delta = this.timer.curr - this.timer.prev;
 
 		// FPS
 		++this.fpsCount;
-		if (this.timer.curr - this.fpsTime >= 1000) {
-			const fps = this.fpsCount * 1000 / (this.timer.curr - this.fpsTime);
+		if (this.timer.curr - this.fpsTime >= 1.0) {
+			const fps = this.fpsCount / (this.timer.curr - this.fpsTime);
 			document.getElementById("fps").innerHTML = Math.round(fps).toString();
 
 			this.fpsCount = 0;
@@ -201,7 +209,10 @@ class App {
 			gamepads: undefined,
 			multiplier: 1
 		};
-		this.cameraManager.update(input, this.timer.delta);
+		this.cameraManager.update(input, this.timer.delta * 1000);
+
+		// Particles
+		this.particleManager.update(this.timer.delta);
 
 		// Render
 		this.render();
