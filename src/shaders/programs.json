@@ -5,5 +5,19 @@
 			"vertex": "water.vert",
 			"fragment": "water.frag"
 		}
+	},
+	"custom_post": {
+		"description": "Post processing.",
+		"shaders": {
+			"vertex": "post.vert",
+			"fragment": "post.frag"
+		}
+	},
+	"custom_particles_draw": {
+		"description": "Draw particles.",
+		"shaders": {
+			"vertex": "particles/particles_draw.vert",
+			"fragment": "particles/particles_draw.frag"
+		}
 	}
 }

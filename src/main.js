@@ -1,14 +1,5 @@
 import * as RC from "/rendercore/src/RenderCore.js"
-import { ParticleManager } from "./particle_manager.js";
 
-/** 
- * TODO:
- * -Fullscreen canvas
- * -FPS counter
- * -Canvas resize
- */
-
-let x = new ParticleManager();
 class App {
 	constructor(canvas) {
 		// Canvas
@@ -38,6 +29,7 @@ class App {
 		this.loadResources(
 			() => { window.requestAnimationFrame(() => { this.update(); }); }
 		);
+		//window.requestAnimationFrame(() => { this.update(); });
 	}
 
 
@@ -73,27 +65,100 @@ class App {
 		// Plane
 		let plane = new RC.Quad({x: -32, y: 32}, {x: 32, y: -32}, new RC.MeshPhongMaterial());
 		plane.material.color = new RC.Color("#FFFFFF");
-		plane.material.color = new RC.Color("#FFFFFF");
 		plane.material.specular = new RC.Color("#FFFFFF");
 		plane.material.shininess = 1;
 		plane.material.side = RC.FRONT_AND_BACK_SIDE;
+
+
+		let pixelData = new Uint8Array([
+			0, 255, 0, 255
+		]);
+		let texture = new RC.Texture(pixelData, RC.Texture.ClampToEdgeWrapping, RC.Texture.ClampToEdgeWrapping,
+			RC.Texture.NearestFilter, RC.Texture.NearestFilter,
+			RC.Texture.RGBA, RC.Texture.RGBA, RC.Texture.UNSIGNED_BYTE, 1, 1);
+
 		plane.translateY(-4);
 		plane.rotateX(Math.PI * 0.5);
+
+		plane.material.addMap(texture);
 		this.scene.add(plane);
 
-		// Particles
-		this.particleManager = new ParticleManager(this.scene, this.camera, 200, 0.004, 5, 100);
 
-		/// Post production scene
-		let waterShaderMaterial = new RC.CustomShaderMaterial("water");
-		waterShaderMaterial.color = new RC.Color(1.0, 1.0, 1.0);
+		// // Points
+		// let dim = 10;
+		// let vertices = new Float32Array(dim * dim * dim * 3);
+		// for (let x = 0; x < dim; ++x) {
+		// 	for (let y = 0; y < dim; ++y) {
+		// 		for (let z = 0; z < dim; ++z) {
+		// 			let i = x + dim * (y + dim * z);
+		// 			vertices[3 * i + 0] = x - dim/2;
+		// 			vertices[3 * i + 1] = y - dim/2;
+		// 			vertices[3 * i + 2] = z - dim/2;
+		// 		}
+		// 	}
+		// }
 
-		this.postScene = new RC.Scene();
-		this.postQuad = new RC.Quad(new RC.Vector2(-1.0, -1.0), new RC.Vector2(1.0, 1.0), waterShaderMaterial, undefined, true);
-		this.postScene.add(this.postQuad);
+		// let geo = new RC.Geometry();
+		// geo.vertices = new RC.BufferAttribute(vertices, 3);
 
-		this.postCamera = new RC.OrthographicCamera(-1, 1, 1, -1, 0.1, 2);
-		this.postCamera.position = new RC.Vector3(0, 0, 1);
+		// let mat = new RC.CustomShaderMaterial("particles_draw");
+		// mat.usePoints = true;
+		// mat.pointSize = 20.0;
+		// mat.lights = false;
+
+		// let mesh = new RC.Mesh(geo, mat);
+		// mesh.renderingPrimitive = RC.POINTS;
+
+		// this.scene.add(mesh);
+
+		// Texture based particles
+		let sz = 1024;
+		let tmp = Math.ceil(Math.pow(sz * sz, 1/3));
+		let particleData = new Float32Array(sz * sz * 3);
+
+		loop: for (let z = 0; z < tmp; ++z) {
+			for (let y = 0; y < tmp; ++y) {
+				for (let x = 0; x < tmp; ++x) {
+					let i = x + tmp * (y + tmp * z);
+					if (i >= sz * sz)
+						break loop;
+					particleData[3 * i + 0] = x - tmp/2;
+					particleData[3 * i + 1] = y - tmp/2;
+					particleData[3 * i + 2] = z - tmp/2;
+				}
+			}
+		}
+
+		this.particleTex = new RC.Texture(particleData,
+			RC.Texture.ClampToEdgeWrapping, RC.Texture.ClampToEdgeWrapping,
+			RC.Texture.NearestFilter, RC.Texture.NearestFilter,
+			RC.Texture.RGB32F, RC.Texture.RGB, RC.Texture.FLOAT,
+			sz, sz
+		);
+
+		// Points
+		let vertices = new Float32Array(sz * sz * 3);
+		for (let x = 0; x < sz; ++x) {
+			for (let y = 0; y < sz; ++y) {
+				let i = x + sz * y;
+				vertices[3 * i + 0] = 0.5 + x / sz;
+				vertices[3 * i + 1] = 0.5 + y / sz;
+			}
+		}
+
+		let geo = new RC.Geometry();
+		geo.vertices = new RC.BufferAttribute(vertices, 3);
+
+		let mat = new RC.CustomShaderMaterial("particles_draw");
+		mat.usePoints = true;
+		mat.pointSize = 20.0;
+		mat.lights = false;
+		mat.addMap(this.particleTex);
+
+		let mesh = new RC.Mesh(geo, mat);
+		mesh.renderingPrimitive = RC.POINTS;
+
+		this.scene.add(mesh);
 	}
 
 	initRenderQueue() {
@@ -116,27 +181,33 @@ class App {
 			}]
 		);
 
-		this.waterRenderPass = new RC.RenderPass(
-			// Type
-			RC.RenderPass.BASIC,
-			// Init function
-			(textureMap, additionalData) => {
-				this.postQuad.material.addMap(textureMap.MainRenderColor);
-				this.postQuad.material.addMap(textureMap.MainRenderDepth);
+		this.postRenderPass = new RC.RenderPass(
+			// Rendering pass type
+			RC.RenderPass.POSTPROCESS,
+
+			// Initialize function
+			function (textureMap, additionalData) {
+				/** runs once */
 			},
+		
 			// Preprocess function
-			(textureMap, additionalData) => {
-				return { scene: this.postScene, camera: this.postCamera };
+			function (textureMap, additionalData) {
+				let w = new RC.CustomShaderMaterial("water");
+				w.ligths = false;
+		
+				return {material: w, textures: [textureMap.MainRenderColor, textureMap.MainRenderDepth]};
 			},
+
 			// Target
 			RC.RenderPass.SCREEN,
+		
 			// Viewport
-			{ width: this.canvas.width, height: this.canvas.height },
+    		{ width: this.canvas.width, height: this.canvas.height }
 		);
 
 		this.renderQueue = new RC.RenderQueue(this.renderer);
 		this.renderQueue.pushRenderPass(this.mainRenderPass);
-		this.renderQueue.pushRenderPass(this.waterRenderPass);
+		this.renderQueue.pushRenderPass(this.postRenderPass);
 	}
 
 	loadResources(callback) {
@@ -211,9 +282,6 @@ class App {
 		};
 		this.cameraManager.update(input, this.timer.delta * 1000);
 
-		// Particles
-		this.particleManager.update(this.timer.delta);
-
 		// Render
 		this.render();
 		window.requestAnimationFrame(() => { this.update(); });
@@ -232,10 +300,10 @@ class App {
 		// Update aspect ratio and viewport
 		this.camera.aspect = this.canvas.width / this.canvas.height;
 		this.renderer.updateViewport(this.canvas.width, this.canvas.height);
-	
+
 		// Update render passes
 		this.mainRenderPass.viewport = { width: this.canvas.width, height: this.canvas.height };
-		this.waterRenderPass.viewport = { width: this.canvas.width, height: this.canvas.height };
+		this.postRenderPass.viewport = { width: this.canvas.width, height: this.canvas.height };
 	}
 }
 

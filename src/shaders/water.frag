@@ -2,7 +2,6 @@
 precision mediump float;
 
 struct Material {
-	vec3 diffuse;
 	#if (TEXTURE)
 		#for I_TEX in 0 to NUM_TEX
 			sampler2D texture##I_TEX;
@@ -26,7 +25,6 @@ float depth2dist(float depth) {
 }
 
 void main() {
-	//color = vec4(material.diffuse, 1.0);
 	color = texture(material.texture0, fragUV);
 
 	float maxDist = 30.0;
