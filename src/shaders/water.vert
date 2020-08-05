@@ -17,4 +17,4 @@ void main() {
 		// Pass uv coordinate to fragment shader
 		fragUV = uv;
 	#fi
- }
+}

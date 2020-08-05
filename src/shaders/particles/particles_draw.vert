@@ -7,33 +7,36 @@ uniform mat4 PMat;  // Projection Matrix
 in vec3 VPos;       // Vertex position
 
 struct Material {
-	#if (TEXTURE)
-		#for I_TEX in 0 to NUM_TEX
-			sampler2D texture##I_TEX;
-		#end
-	#fi
+	sampler2D texture0;
 };
 
 uniform Material material;
+uniform float uvOff;
 
 // Output transformed vertex position
-out vec3 fragVPos;
+out vec4 vColor;
+out float vProjSize;
 
 uniform float pointSize;
 
 void main() {
-    
-    // Model view position
-    vec3 pos = texture(material.texture0, VPos.xy).xyz;
-    vec4 VPos4 = MVMat * vec4(pos, 1.0);
+    // Data
+    vec4 texel0 = texture(material.texture0, VPos.xy);
+    vec4 texel1 = texture(material.texture0, VPos.xy + vec2(uvOff, 0.0));
+
+    vec3 pos = texel0.xyz;
+    float life = texel0.w;
 
     // Projected position
-    gl_Position = PMat * VPos4;
-    fragVPos = vec3(VPos4) / VPos4.w;
+    vec4 eyePos = MVMat * vec4(pos, 1.0);
+    gl_Position = PMat * eyePos;
 
-    float distance = sqrt((fragVPos.x*fragVPos.x)+(fragVPos.y*fragVPos.y)+(fragVPos.z*fragVPos.z));
-    if(pointSize < 0.0) gl_PointSize = 1.0;
-    else gl_PointSize = pointSize/distance;
-    //gl_PointSize = 10.0;
+    // Projected point size
+    vec4 projSize4 = PMat * vec4(pointSize, 0.0, eyePos.zw);
+    vProjSize = projSize4.x / projSize4.w;
+    gl_PointSize = vProjSize;
 
+    // Particle colour
+    float opacity = vProjSize >= 1.0 ? 1.0 : vProjSize;// * vProjSize;
+    vColor = vec4(1.0, 1.0, 1.0, opacity);
 }

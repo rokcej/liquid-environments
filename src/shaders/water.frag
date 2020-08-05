@@ -44,5 +44,5 @@ void main() {
 
 	// Beer's law
 	float transmittance = exp(-0.1 * dist);
-	color = mix(waterColor, color, transmittance);
+	//color = mix(waterColor, color, transmittance);
 }

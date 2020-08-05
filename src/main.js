@@ -71,7 +71,7 @@ class App {
 
 
 		let pixelData = new Uint8Array([
-			0, 255, 0, 255
+			230, 230, 230, 255
 		]);
 		let texture = new RC.Texture(pixelData, RC.Texture.ClampToEdgeWrapping, RC.Texture.ClampToEdgeWrapping,
 			RC.Texture.NearestFilter, RC.Texture.NearestFilter,
@@ -83,92 +83,139 @@ class App {
 		plane.material.addMap(texture);
 		this.scene.add(plane);
 
-
-		// // Points
-		// let dim = 10;
-		// let vertices = new Float32Array(dim * dim * dim * 3);
-		// for (let x = 0; x < dim; ++x) {
-		// 	for (let y = 0; y < dim; ++y) {
-		// 		for (let z = 0; z < dim; ++z) {
-		// 			let i = x + dim * (y + dim * z);
-		// 			vertices[3 * i + 0] = x - dim/2;
-		// 			vertices[3 * i + 1] = y - dim/2;
-		// 			vertices[3 * i + 2] = z - dim/2;
-		// 		}
-		// 	}
-		// }
-
-		// let geo = new RC.Geometry();
-		// geo.vertices = new RC.BufferAttribute(vertices, 3);
-
-		// let mat = new RC.CustomShaderMaterial("particles_draw");
-		// mat.usePoints = true;
-		// mat.pointSize = 20.0;
-		// mat.lights = false;
-
-		// let mesh = new RC.Mesh(geo, mat);
-		// mesh.renderingPrimitive = RC.POINTS;
-
-		// this.scene.add(mesh);
-
 		// Texture based particles
+		let n_comp = 2;
 		let sz = 1024;
-		let tmp = Math.ceil(Math.pow(sz * sz, 1/3));
-		let particleData = new Float32Array(sz * sz * 3);
+		let particleData = new Float32Array(sz * sz * n_comp * 4);
 
-		loop: for (let z = 0; z < tmp; ++z) {
-			for (let y = 0; y < tmp; ++y) {
-				for (let x = 0; x < tmp; ++x) {
-					let i = x + tmp * (y + tmp * z);
-					if (i >= sz * sz)
-						break loop;
-					particleData[3 * i + 0] = x - tmp/2;
-					particleData[3 * i + 1] = y - tmp/2;
-					particleData[3 * i + 2] = z - tmp/2;
-				}
+		for (let y = 0; y < sz; ++y) {
+			for (let x = 0; x < sz; ++x) {
+				let i = y * sz + x;
+				// // Position
+				// particleData[n_comp * 4 * i + 0] = 0.0;
+				// particleData[n_comp * 4 * i + 1] = 0.0;
+				// particleData[n_comp * 4 * i + 2] = 0.0;
+
+				// Life
+				particleData[n_comp * 4 * i + 3] = 0.0;
+
+				// // Velocity
+				// particleData[n_comp * 4 * i + 4] = 0.0;
+				// particleData[n_comp * 4 * i + 5] = 0.0;
+				// particleData[n_comp * 4 * i + 6] = 0.0;
+
+				// Random
+				particleData[n_comp * 4 * i + 7] = Math.random();
 			}
 		}
 
 		this.particleTex = new RC.Texture(particleData,
 			RC.Texture.ClampToEdgeWrapping, RC.Texture.ClampToEdgeWrapping,
 			RC.Texture.NearestFilter, RC.Texture.NearestFilter,
-			RC.Texture.RGB32F, RC.Texture.RGB, RC.Texture.FLOAT,
-			sz, sz
+			RC.Texture.RGBA32F, RC.Texture.RGBA, RC.Texture.FLOAT,
+			sz * n_comp, sz
+		);
+
+		this.particleTex2 = new RC.Texture(null,
+			RC.Texture.ClampToEdgeWrapping, RC.Texture.ClampToEdgeWrapping,
+			RC.Texture.NearestFilter, RC.Texture.NearestFilter,
+			RC.Texture.RGBA32F, RC.Texture.RGBA, RC.Texture.FLOAT,
+			sz * n_comp, sz
 		);
 
 		// Points
 		let vertices = new Float32Array(sz * sz * 3);
-		for (let x = 0; x < sz; ++x) {
-			for (let y = 0; y < sz; ++y) {
+		for (let y = 0; y < sz; ++y) {
+			for (let x = 0; x < sz; ++x) {
 				let i = x + sz * y;
-				vertices[3 * i + 0] = 0.5 + x / sz;
-				vertices[3 * i + 1] = 0.5 + y / sz;
+				vertices[3 * i + 0] = (x + 0.5 / n_comp) / sz;
+				vertices[3 * i + 1] = (y + 0.5) / sz;
+				vertices[3 * i + 2] = 0.0;
 			}
 		}
 
 		let geo = new RC.Geometry();
 		geo.vertices = new RC.BufferAttribute(vertices, 3);
 
-		let mat = new RC.CustomShaderMaterial("particles_draw");
+		let mat = new RC.CustomShaderMaterial("particles_draw", { "uvOff": 1.0 / (sz * n_comp) });
+		mat.transparent = true;
+		//mat.depthWrite = false;
 		mat.usePoints = true;
-		mat.pointSize = 20.0;
+		mat.pointSize = 8.0;
 		mat.lights = false;
-		mat.addMap(this.particleTex);
+		mat.addMap(this.particleTex2);
 
-		let mesh = new RC.Mesh(geo, mat);
-		mesh.renderingPrimitive = RC.POINTS;
+		this.particleMesh = new RC.Mesh(geo, mat);
+		this.particleMesh.renderingPrimitive = RC.POINTS;
 
-		this.scene.add(mesh);
+		this.scene.add(this.particleMesh);
+
+		// Display particle textures
+		let q1 = new RC.Quad({x: -1, y: -.5}, {x: 1, y: .5}, new RC.MeshBasicMaterial());
+		q1.position = new RC.Vector3(-3,0,-2);
+		q1.material.side = RC.Material.FRONT_AND_BACK_SIDE;
+		q1.material.color = new RC.Color("#FFFFFF");
+		q1.material.addMap(this.particleTex2);
+		this.scene.add(q1);
+
+		let q2 = new RC.Quad({x: -1, y: -.5}, {x: 1, y: .5}, new RC.MeshBasicMaterial());
+		q2.position = new RC.Vector3(3,0,-2);
+		q2.material.side = RC.Material.FRONT_AND_BACK_SIDE;
+		q2.material.color = new RC.Color("#FFFFFF");
+		q2.material.addMap(this.particleTex2);
+		this.scene.add(q2);
+
+		this.q1 = q1;
+		this.q2 = q2;
 	}
 
 	initRenderQueue() {
+		this.particleUpdatePass = new RC.RenderPass(
+			// Rendering pass type
+			RC.RenderPass.POSTPROCESS,
+			// Initialize function
+			(textureMap, additionalData) => {},
+			// Preprocess function
+			(textureMap, additionalData) => {
+				let mat = new RC.CustomShaderMaterial("particles_update", {
+					"uRes": [this.particleTex.width, this.particleTex.height],
+					"uDT": this.timer.delta,
+					"uSeed": Math.random(),
+					"uCameraPos": this.camera.position.toArray()
+				});
+				mat.ligths = false;
+		
+				return { material: mat, textures: [textureMap.particlesRead] };
+			},
+			// Target
+			RC.RenderPass.TEXTURE,
+			// Viewport
+			{ width: this.particleTex.width, height: this.particleTex.height },
+			// Don't render depth tex
+			"null_doesnt_work",
+			// Output texture
+			[{
+				id: "particlesWrite",
+				textureConfig: {
+					wrapS: this.particleTex.wrapS,
+					wrapT: this.particleTex.wrapT,
+					minFilter: this.particleTex.minFilter,
+					magFilter: this.particleTex.magFilter,
+					internalFormat: this.particleTex.internalFormat,
+					format: this.particleTex.format,
+					type: this.particleTex.type
+				}
+			}]
+		);
+
 		this.mainRenderPass = new RC.RenderPass(
 			// Type
 			RC.RenderPass.BASIC,
 			// Init function
 			(textureMap, additionalData) => {},
 			// Preprocess function
-			(textureMap, additionalData) => { return { scene: this.scene, camera: this.camera }; },
+			(textureMap, additionalData) => { 
+				return { scene: this.scene, camera: this.camera }; },
 			// Target
 			RC.RenderPass.TEXTURE,
 			// Viewport
@@ -184,30 +231,31 @@ class App {
 		this.postRenderPass = new RC.RenderPass(
 			// Rendering pass type
 			RC.RenderPass.POSTPROCESS,
-
 			// Initialize function
-			function (textureMap, additionalData) {
-				/** runs once */
-			},
-		
+			(textureMap, additionalData) => {},
 			// Preprocess function
-			function (textureMap, additionalData) {
-				let w = new RC.CustomShaderMaterial("water");
-				w.ligths = false;
+			(textureMap, additionalData) => {
+				let mat = new RC.CustomShaderMaterial("water");
+				mat.ligths = false;
 		
-				return {material: w, textures: [textureMap.MainRenderColor, textureMap.MainRenderDepth]};
+				return {material: mat, textures: [textureMap.MainRenderColor, textureMap.MainRenderDepth]};
 			},
-
 			// Target
 			RC.RenderPass.SCREEN,
-		
 			// Viewport
     		{ width: this.canvas.width, height: this.canvas.height }
 		);
 
 		this.renderQueue = new RC.RenderQueue(this.renderer);
+
+		this.renderQueue.addTexture("particlesRead", this.particleTex);
+		this.renderQueue.addTexture("particlesWrite", this.particleTex2);
+
+		this.renderQueue.pushRenderPass(this.particleUpdatePass);
 		this.renderQueue.pushRenderPass(this.mainRenderPass);
 		this.renderQueue.pushRenderPass(this.postRenderPass);
+
+		this.once = 0;
 	}
 
 	loadResources(callback) {
@@ -228,7 +276,7 @@ class App {
 				obj[i].material.shininess = 16;
 
 				obj[i].geometry.drawWireframe = false;
-				this.scene.add(obj[i]);
+				//this.scene.add(obj[i]);
 
 				// Clone bunnies
 				const count = 5;
@@ -290,6 +338,21 @@ class App {
 	render() {
 		//this.renderer.render(this.scene, this.camera);
 		this.renderQueue.render();
+
+		if (this.once++ > 200) {
+			// Swap WebGL textures
+			let glmap = this.renderer._glManager._textureManager._cached_textures;
+			let tex1 = glmap.get(this.particleTex);
+			let tex2 = glmap.get(this.particleTex2);
+			glmap.set(this.particleTex, tex2);
+			glmap.set(this.particleTex2, tex1);
+
+			// // Swap RenderCore textures
+			// let map = this.renderQueue._textureMap;
+			// let temp = map.particlesRead;
+			// map.particlesRead = map.particlesWrite;
+			// map.particlesWrite = temp;
+		}
 	}
 
 	resize() {

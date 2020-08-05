@@ -19,5 +19,12 @@
 			"vertex": "particles/particles_draw.vert",
 			"fragment": "particles/particles_draw.frag"
 		}
+	},
+	"custom_particles_update": {
+		"description": "Update particles.",
+		"shaders": {
+			"vertex": "particles/particles_update.vert",
+			"fragment": "particles/particles_update.frag"
+		}
 	}
 }
