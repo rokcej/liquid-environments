@@ -114,9 +114,11 @@ void main() {
 	int texelOffset = int(mod(gl_FragCoord.x, 2.0));
 	Particle p = readData(texelOffset);
 
+	// Init RNG
 	gold_noise_state = (p.seed + uSeed) * 0.5;
 	xorshift32_state = uint(((p.seed + uSeed) * 0.5) * float(0xFFFFFFFFu));
 
+	// Process particle
 	p.life -= uDT;
 	if (p.life > 0.0) { // Update particle
 		p.pos += p.vel * uDT;

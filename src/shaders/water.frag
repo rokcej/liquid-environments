@@ -2,18 +2,14 @@
 precision mediump float;
 
 struct Material {
-	#if (TEXTURE)
-		#for I_TEX in 0 to NUM_TEX
-			sampler2D texture##I_TEX;
-		#end
-	#fi
+	#for I_TEX in 0 to NUM_TEX
+		sampler2D texture##I_TEX;
+	#end
 };
 
 uniform Material material;
 
-#if (TEXTURE)
-	in vec2 fragUV;
-#fi
+in vec2 fragUV;
 
 out vec4 color;
 
@@ -25,7 +21,10 @@ float depth2dist(float depth) {
 }
 
 void main() {
-	color = texture(material.texture0, fragUV);
+	vec4 mainColor = texture(material.texture0, fragUV);
+	vec4 particleColor = texture(material.texture2, fragUV);
+	//color = vec4(particleColor.rgb * particleColor.a + mainColor.rgb * (1.0 - particleColor.a), 1.0);
+	color = mainColor + particleColor;
 
 	float maxDist = 30.0;
 	float minAtten = 0.1;
@@ -33,14 +32,6 @@ void main() {
 
 	float depth = texture(material.texture1, fragUV).r;
 	float dist = depth2dist(depth);
-
-	// Attenuation based on distance
-	/*float atten = min(dist / maxDist, 1.0);
-	atten = pow(atten, 0.8); // Make the falloff less linear
-	atten = atten * (1.0 - minAtten) + minAtten; // Add initial attenuation
-
-	//color *= vec4(vec3(atten), 1.0);
-	color = mix(color, waterColor, atten);*/
 
 	// Beer's law
 	float transmittance = exp(-0.1 * dist);

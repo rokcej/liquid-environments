@@ -8,6 +8,7 @@ in vec3 VPos;       // Vertex position
 
 struct Material {
 	sampler2D texture0;
+    sampler2D texture1;
 };
 
 uniform Material material;

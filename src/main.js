@@ -141,14 +141,15 @@ class App {
 		mat.transparent = true;
 		//mat.depthWrite = false;
 		mat.usePoints = true;
-		mat.pointSize = 8.0;
+		mat.pointSize = 5.0;
 		mat.lights = false;
+		mat.useClippingPlanes = false;
 		mat.addMap(this.particleTex2);
 
 		this.particleMesh = new RC.Mesh(geo, mat);
 		this.particleMesh.renderingPrimitive = RC.POINTS;
 
-		this.scene.add(this.particleMesh);
+		//this.scene.add(this.particleMesh);
 
 		// Display particle textures
 		let q1 = new RC.Quad({x: -1, y: -.5}, {x: 1, y: .5}, new RC.MeshBasicMaterial());
@@ -167,15 +168,16 @@ class App {
 
 		this.q1 = q1;
 		this.q2 = q2;
+
+		
+		this.particleScene = new RC.Scene();
+		this.particleScene.add(this.particleMesh);
 	}
 
 	initRenderQueue() {
 		this.particleUpdatePass = new RC.RenderPass(
-			// Rendering pass type
 			RC.RenderPass.POSTPROCESS,
-			// Initialize function
 			(textureMap, additionalData) => {},
-			// Preprocess function
 			(textureMap, additionalData) => {
 				let mat = new RC.CustomShaderMaterial("particles_update", {
 					"uRes": [this.particleTex.width, this.particleTex.height],
@@ -187,13 +189,9 @@ class App {
 		
 				return { material: mat, textures: [textureMap.particlesRead] };
 			},
-			// Target
 			RC.RenderPass.TEXTURE,
-			// Viewport
 			{ width: this.particleTex.width, height: this.particleTex.height },
-			// Don't render depth tex
 			"null_doesnt_work",
-			// Output texture
 			[{
 				id: "particlesWrite",
 				textureConfig: {
@@ -208,41 +206,52 @@ class App {
 			}]
 		);
 
-		this.mainRenderPass = new RC.RenderPass(
-			// Type
+		this.particleDrawPass = new RC.RenderPass(
 			RC.RenderPass.BASIC,
-			// Init function
-			(textureMap, additionalData) => {},
-			// Preprocess function
-			(textureMap, additionalData) => { 
-				return { scene: this.scene, camera: this.camera }; },
-			// Target
+			(textureMap, additionalData) => {
+				this.particleMesh.material.addMap(textureMap.mainDepth);
+			},
+			(textureMap, additionalData) => {
+				this.particleMesh.material.setUniform("uRes", [this.canvas.width, this.canvas.height]);
+				this.particleMesh.material.setUniform("uCameraRange", [this.camera.near, this.camera.far]);
+				return { scene: this.particleScene, camera: this.camera };
+			},
 			RC.RenderPass.TEXTURE,
-			// Viewport
 			{ width: this.canvas.width, height: this.canvas.height },
-			// Bind depth texture to this ID
-			"MainRenderDepth",
+			"particleDepth",
 			[{
-			  id: "MainRenderColor",
+				id: "particleColor",
+				textureConfig: RC.RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG
+			}]
+		);
+
+		this.mainRenderPass = new RC.RenderPass(
+			RC.RenderPass.BASIC,
+			(textureMap, additionalData) => {},
+			(textureMap, additionalData) => {
+				return { scene: this.scene, camera: this.camera };
+			},
+			RC.RenderPass.TEXTURE,
+			{ width: this.canvas.width, height: this.canvas.height },
+			"mainDepth",
+			[{
+			  id: "mainColor",
 			  textureConfig: RC.RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG
 			}]
 		);
 
 		this.postRenderPass = new RC.RenderPass(
-			// Rendering pass type
 			RC.RenderPass.POSTPROCESS,
-			// Initialize function
 			(textureMap, additionalData) => {},
-			// Preprocess function
 			(textureMap, additionalData) => {
 				let mat = new RC.CustomShaderMaterial("water");
 				mat.ligths = false;
-		
-				return {material: mat, textures: [textureMap.MainRenderColor, textureMap.MainRenderDepth]};
+				return { 
+					material: mat,
+					textures: [textureMap.mainColor, textureMap.mainDepth, textureMap.particleColor]
+				};
 			},
-			// Target
 			RC.RenderPass.SCREEN,
-			// Viewport
     		{ width: this.canvas.width, height: this.canvas.height }
 		);
 
@@ -253,6 +262,7 @@ class App {
 
 		this.renderQueue.pushRenderPass(this.particleUpdatePass);
 		this.renderQueue.pushRenderPass(this.mainRenderPass);
+		this.renderQueue.pushRenderPass(this.particleDrawPass);
 		this.renderQueue.pushRenderPass(this.postRenderPass);
 
 		this.once = 0;
@@ -276,7 +286,7 @@ class App {
 				obj[i].material.shininess = 16;
 
 				obj[i].geometry.drawWireframe = false;
-				//this.scene.add(obj[i]);
+				this.scene.add(obj[i]);
 
 				// Clone bunnies
 				const count = 5;
@@ -367,6 +377,7 @@ class App {
 		// Update render passes
 		this.mainRenderPass.viewport = { width: this.canvas.width, height: this.canvas.height };
 		this.postRenderPass.viewport = { width: this.canvas.width, height: this.canvas.height };
+		this.particleDrawPass.viewport = { width: this.canvas.width, height: this.canvas.height };
 	}
 }
 
