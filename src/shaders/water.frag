@@ -13,7 +13,7 @@ uniform vec2 uRes; // Viewport resolution
 uniform vec2 uCameraRange; // Camera near & far values
 
 uniform vec3 uLiquidColor;
-uniform float uLiquidAtten;
+uniform vec3 uLiquidAtten;
 
 in vec2 fragUV;
 
@@ -27,15 +27,9 @@ float linearizeDepth(float z_buf) {
 
 vec3 applyFog(vec3 colorBuf, float depthBuf, bool transparent) {
 	float depth = linearizeDepth(depthBuf);
-
-	vec3 atten = vec3(
-		uLiquidAtten + 0.02,
-		uLiquidAtten + 0.01,
-		uLiquidAtten
-	);
 	
 	// Beer's law
-	vec3 transmittance = exp(-atten * depth);
+	vec3 transmittance = exp(-uLiquidAtten * depth);
 	vec3 color = colorBuf * transmittance;
 
 	if (!transparent)
@@ -50,8 +44,18 @@ void main() {
 	mainColor = applyFog(mainColor, mainDepth, false);
 
 	vec3 particleColor = texture(material.texture2, fragUV).rgb;
+	//float particleAlpha = texture(material.texture2, fragUV).a;
 	//float particleDepth = texture(material.texture3, fragUV).r;
 	//particleColor = applyFog(particleColor, particleDepth, true);
 
+	//oColor = vec4(mix(mainColor, particleColor, particleAlpha), 1.0);
 	oColor = vec4(mainColor + particleColor, 1.0);
+	
+	//oColor = vec4(mainColor, 1.0);
+	//oColor = vec4(particleColor, 1.0);
+	//oColor = texture(material.texture3, fragUV);
+
+	// // Gamma correction
+	// float gamma = 2.2;
+	// oColor = vec4(pow(oColor.rgb, vec3(1.0 / gamma)), oColor.a);
 }

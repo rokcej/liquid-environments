@@ -38,7 +38,7 @@ class App {
 
 		let mat = new RC.CustomShaderMaterial("phong_liquid", {
 			"uLiquidColor": this.liquidColor.toArray(),
-			"uLiquidAtten": this.liquidAtten
+			"uLiquidAtten": this.liquidAtten.toArray()
 		});
 		mat.color = color;
 		mat.specular = specular;
@@ -49,7 +49,7 @@ class App {
 	initScene() {
 		/// Main scene
 		this.scene = new RC.Scene();
-		//this.particleScene = new RC.Scene();
+		this.particleScene = new RC.Scene();
 
 		this.camera = new RC.PerspectiveCamera(60, this.canvas.width / this.canvas.height, 0.1, 1000);
 		this.camera.position = new RC.Vector3(0, 0.75, 4);
@@ -60,8 +60,8 @@ class App {
 		this.cameraManager.activeCamera = this.camera;
 
 		// Liquid color
-		this.liquidColor = new RC.Color(0.0, 0.18, 0.4);//0, 0.3, 0.7);
-		this.liquidAtten = 0.05;
+		this.liquidColor = new RC.Color(0.0, 0.18, 0.4); // (0, 0.3, 0.7);
+		this.liquidAtten = new RC.Vector3(0.07, 0.06, 0.05);
 
 		// Lights
 		this.dLight = new RC.DirectionalLight(new RC.Color("#FFFFFF"), 1.0);
@@ -75,10 +75,11 @@ class App {
 		this.pLight.add(new RC.Cube(1.0, this.pLight.color));
 		this.pLight2.add(new RC.Cube(1.0, this.pLight.color));
 
-		//this.scene.add(this.dLight);
-		this.scene.add(this.pLight);
-		this.scene.add(this.pLight2);
-		this.scene.add(this.aLight);
+		this.lights = [this.pLight, this.pLight2, this.aLight]; // , this.dLight];
+		for (let l of this.lights)
+			this.scene.add(l);
+		// for (let l of this.lights)
+		// 	this.particleScene.add(l);
 
 		// Plane
 		let plane = new RC.Quad({x: -64, y: 64}, {x: 64, y: -64}, this.createPhongMat());
@@ -112,19 +113,8 @@ class App {
 		for (let y = 0; y < sz; ++y) {
 			for (let x = 0; x < sz; ++x) {
 				let i = y * sz + x;
-				// // Position
-				// particleData[n_comp * 4 * i + 0] = 0.0;
-				// particleData[n_comp * 4 * i + 1] = 0.0;
-				// particleData[n_comp * 4 * i + 2] = 0.0;
-
 				// Life
 				particleData[n_comp * 4 * i + 3] = 0.0;
-
-				// // Velocity
-				// particleData[n_comp * 4 * i + 4] = 0.0;
-				// particleData[n_comp * 4 * i + 5] = 0.0;
-				// particleData[n_comp * 4 * i + 6] = 0.0;
-
 				// Random
 				particleData[n_comp * 4 * i + 7] = Math.random();
 			}
@@ -162,19 +152,19 @@ class App {
 		mat.color = new RC.Color(1, 1, 1);
 		mat.transparent = true;
 		mat.opacity = 1.0;
-		mat.depthWrite = false;
-		mat.depthTest = true;
+		mat.depthWrite = true;
+		mat.depthTest = false;
 		mat.usePoints = true;
-		mat.pointSize = 4.0;
+		mat.pointSize = 8.0;
 		mat.lights = true;
-		mat.useClippingPlanes = false;
 		mat.addMap(this.particleTex2);
 
 		this.particleMesh = new RC.Mesh(geo, mat);
 		this.particleMesh.renderingPrimitive = RC.POINTS;
+		this.particleMesh.frustumCulled = false;
 
-		this.scene.add(this.particleMesh);
-		// this.particleScene.add(this.particleMesh);
+		//this.scene.add(this.particleMesh);
+		this.particleScene.add(this.particleMesh);
 
 		// Display particle textures
 		let q1 = new RC.Quad({x: -1, y: -.5}, {x: 1, y: .5}, new RC.MeshBasicMaterial());
@@ -196,6 +186,36 @@ class App {
 	}
 
 	initRenderQueue() {
+		// NOISE
+		this.perlinNoisePass = new RC.RenderPass(
+			RC.RenderPass.POSTPROCESS,
+			(textureMap, additionalData) => {},
+			(textureMap, additionalData) => {
+				let mat = new RC.CustomShaderMaterial("perlin_noise", {
+					"uRes": [this.canvas.width, this.canvas.height],
+					"uDT": this.timer.delta,
+					"uSeed": Math.random()
+				});
+				mat.ligths = false;
+				return { material: mat, textures: [] };
+			},
+			RC.RenderPass.TEXTURE,
+			{ width: this.canvas.width, height: this.canvas.height },
+			"dummy0",
+			[{
+				id: "perlinNoise",
+				textureConfig: {
+					wrapS: RC.Texture.ClampToEdgeWrapping,
+					wrapT: RC.Texture.ClampToEdgeWrapping,
+					minFilter: RC.Texture.LinearFilter,
+					magFilter: RC.Texture.LinearFilter,
+					internalFormat: RC.Texture.RGBA,
+					format: RC.Texture.RGBA,
+					type: RC.Texture.UNSIGNED_BYTE
+				}
+			}]
+		);
+		// PARTICLES UPDATE
 		this.particleUpdatePass = new RC.RenderPass(
 			RC.RenderPass.POSTPROCESS,
 			(textureMap, additionalData) => {},
@@ -207,12 +227,11 @@ class App {
 					"uCameraPos": this.camera.position.toArray()
 				});
 				mat.ligths = false;
-		
 				return { material: mat, textures: [textureMap.particlesRead] };
 			},
 			RC.RenderPass.TEXTURE,
 			{ width: this.particleTex.width, height: this.particleTex.height },
-			"null_doesnt_work",
+			"dummy1",
 			[{
 				id: "particlesWrite",
 				textureConfig: {
@@ -226,7 +245,7 @@ class App {
 				}
 			}]
 		);
-
+		// PARTICLES DRAW
 		this.particleDrawPass = new RC.RenderPass(
 			RC.RenderPass.BASIC,
 			(textureMap, additionalData) => {
@@ -236,7 +255,11 @@ class App {
 				this.particleMesh.material.setUniform("uRes", [this.canvas.width, this.canvas.height]);
 				this.particleMesh.material.setUniform("uCameraRange", [this.camera.near, this.camera.far]);
 				this.particleMesh.material.setUniform("uLiquidColor", this.liquidColor.toArray());
-				this.particleMesh.material.setUniform("uLiquidAtten", this.liquidAtten);
+				this.particleMesh.material.setUniform("uLiquidAtten", this.liquidAtten.toArray());
+
+				// for (let l of this.lights)
+				// 	this.particleScene.add(l);
+
 				return { scene: this.particleScene, camera: this.camera };
 			},
 			RC.RenderPass.TEXTURE,
@@ -247,26 +270,24 @@ class App {
 				textureConfig: RC.RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG
 			}]
 		);
-
+		// MAIN
 		this.mainRenderPass = new RC.RenderPass(
 			RC.RenderPass.BASIC,
 			(textureMap, additionalData) => {},
 			(textureMap, additionalData) => {
-				this.particleMesh.material.setUniform("uRes", [this.canvas.width, this.canvas.height]);
-				this.particleMesh.material.setUniform("uCameraRange", [this.camera.near, this.camera.far]);
-				this.particleMesh.material.setUniform("uLiquidColor", this.liquidColor.toArray());
-				this.particleMesh.material.setUniform("uLiquidAtten", this.liquidAtten);
+				// for (let l of this.lights)
+				// 	this.scene.add(l);
+
 				return { scene: this.scene, camera: this.camera };
 			},
 			RC.RenderPass.TEXTURE,
 			{ width: this.canvas.width, height: this.canvas.height },
 			"mainDepth",
 			[
-				{ id: "mainColor", textureConfig: RC.RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG },
-				{ id: "particleColor", textureConfig: RC.RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG}
+				{ id: "mainColor", textureConfig: RC.RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG }
 			]
 		);
-
+		// POST
 		this.postRenderPass = new RC.RenderPass(
 			RC.RenderPass.POSTPROCESS,
 			(textureMap, additionalData) => {},
@@ -275,12 +296,12 @@ class App {
 					"uRes": [this.canvas.width, this.canvas.height],
 					"uCameraRange": [this.camera.near, this.camera.far],
 					"uLiquidColor": this.liquidColor.toArray(),
-					"uLiquidAtten": this.liquidAtten,
+					"uLiquidAtten": this.liquidAtten.toArray(),
 				});
 				mat.ligths = false;
 				return { 
 					material: mat,
-					textures: [textureMap.mainColor, textureMap.mainDepth, textureMap.particleColor]
+					textures: [textureMap.mainColor, textureMap.mainDepth, textureMap.particleColor, textureMap.particleDepth]
 				};
 			},
 			RC.RenderPass.SCREEN,
@@ -292,9 +313,10 @@ class App {
 		this.renderQueue.addTexture("particlesRead", this.particleTex);
 		this.renderQueue.addTexture("particlesWrite", this.particleTex2);
 
-		this.renderQueue.pushRenderPass(this.particleUpdatePass);
+		this.renderQueue.pushRenderPass(this.perlinNoisePass);
 		this.renderQueue.pushRenderPass(this.mainRenderPass);
-		//this.renderQueue.pushRenderPass(this.particleDrawPass);
+		this.renderQueue.pushRenderPass(this.particleUpdatePass);
+		this.renderQueue.pushRenderPass(this.particleDrawPass);
 		this.renderQueue.pushRenderPass(this.postRenderPass);
 
 		this.once = 0;
@@ -319,12 +341,13 @@ class App {
 				this.scene.add(obj[i]);
 
 				// Clone bunnies
-				const count = 8;
+				const countX = 6;
+				const countZ = 8;
 				const space = 4;
 				const colors = Object.values(RC.Color.NAMES);
 
-				for (let x = -(count-1) * space / 2; x <= (count-1) * space / 2; x += space) {
-					for (let z = 0; z >= -(count-1) * space; z -= space) {
+				for (let x = -(countX-1) * space / 2; x <= (countX-1) * space / 2; x += space) {
+					for (let z = 0; z >= -(countZ-1) * space; z -= space) {
 						let clone = new RC.Mesh(obj[i].geometry, this.createPhongMat());
 						clone.position = new RC.Vector3(x, Math.random() * 8 - 4, z - 2);
 
@@ -407,7 +430,7 @@ class App {
 		// Update render passes
 		this.mainRenderPass.viewport = { width: this.canvas.width, height: this.canvas.height };
 		this.postRenderPass.viewport = { width: this.canvas.width, height: this.canvas.height };
-		//this.particleDrawPass.viewport = { width: this.canvas.width, height: this.canvas.height };
+		this.particleDrawPass.viewport = { width: this.canvas.width, height: this.canvas.height };
 	}
 }
 

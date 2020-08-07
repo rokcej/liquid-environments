@@ -123,9 +123,9 @@ void main() {
 	if (p.life > 0.0) { // Update particle
 		p.pos += p.vel * uDT;
 	} else { // Respawn particle
-		p.pos = sampleUnitSphere() * 20.0 + uCameraPos;
-		p.life = rand() * 25.0 + 5.0;
-		p.vel = vec3(rand(), rand(), rand()) * 0.1 - 0.05;
+		p.pos = sampleUnitSphere() * 25.0 + uCameraPos;
+		p.life = rand() * 15.0 + 5.0;
+		p.vel = vec3(rand(), rand(), rand()) * 0.05 - 0.025;
 	}
 
 	writeData(p, texelOffset);

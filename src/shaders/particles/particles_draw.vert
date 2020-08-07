@@ -38,11 +38,9 @@ void main() {
     vec3 pos = texel0.xyz;
     float life = texel0.w;
 
-    // World position
-    vPos = pos;
-
     // Projected position
     vec4 eyePos = MVMat * vec4(pos, 1.0);
+    vPos = eyePos.xyz / eyePos.w;
     gl_Position = PMat * eyePos;
 
     // Projected point size
@@ -50,7 +48,8 @@ void main() {
     vProjSize = projSize4.x / projSize4.w;
     gl_PointSize = vProjSize;
 
-    // Particle colour
+    // Opacity
     float opacity = vProjSize >= 1.0 ? 1.0 : vProjSize * vProjSize;
+    
     vColor = vec4(material.diffuse, opacity * alpha);
 }

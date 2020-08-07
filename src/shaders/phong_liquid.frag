@@ -31,8 +31,7 @@ uniform float alpha;
 float alpha = 1.0;
 #fi
 
-uniform vec3 uLiquidColor;
-uniform float uLiquidAtten;
+uniform vec3 uLiquidAtten;
 
 // From vertex shader
 in vec3 fragVNorm;
@@ -61,7 +60,6 @@ out vec4 oColor[3];
 
 // Calculates the point light color contribution
 vec3 calcPointLight (Light light, vec3 normal, vec3 viewDir) {
-
 	vec3 lightDir = normalize(light.position - fragVPos);
 
 	// Difuse
@@ -75,26 +73,18 @@ vec3 calcPointLight (Light light, vec3 normal, vec3 viewDir) {
 	float dist = length(light.position - fragVPos);
 	float attenuation = 1.0f / (1.0f + 0.01f * dist + 0.0001f * (dist * dist));
 
-	// Combine results
-	vec3 diffuse  = light.color * diffuseF  * material.diffuse  * attenuation;
-	vec3 specular = light.color * specularF * material.specular * attenuation;
-	
-	// return (diffuse + specular);
+	// Transmittance
+	vec3 transmittance = exp(-uLiquidAtten * dist);
 
-	// float transmittance = exp(-uLiquidAtten * dist);
-	// return mix(uLiquidColor, (diffuse + specular), transmittance);
-	
-	vec3 atten = vec3(
-		uLiquidAtten + 0.02,
-		uLiquidAtten + 0.01,
-		uLiquidAtten
-	);
-	vec3 transmittance = exp(-atten * dist);
-	return (diffuse + specular) * transmittance;
+	// Combine results
+	vec3 diffuse  = light.color * diffuseF  * material.diffuse  * transmittance * attenuation;
+	vec3 specular = light.color * specularF * material.specular * transmittance * attenuation;
+
+	// Attenuation
+	return (diffuse + specular);
 }
 
 vec3 calcDirectLight (Light light, vec3 normal, vec3 viewDir) {
-
 	vec3 lightDir = normalize(light.position);
 
 	// Difuse
@@ -112,7 +102,6 @@ vec3 calcDirectLight (Light light, vec3 normal, vec3 viewDir) {
 }
 
 void main() {
-
 	#if (CLIPPING_PLANES)
 		bool clipped = true;
 		for(int i = 0; i < ##NUM_CLIPPING_PLANES; i++){
@@ -120,7 +109,6 @@ void main() {
 		}
 		if ( clipped ) discard;
 	#fi
-
 
 	#if (CIRCLES)
 		vec2 cxy = 2.0 * gl_PointCoord - 1.0;
@@ -130,7 +118,6 @@ void main() {
 			//oColor = vec4(1.0, 1.0, 1.0, 0.0);
 		}
 	#fi
-
 
 	vec3 normal = normalize(fragVNorm);
 	vec3 viewDir = normalize(-fragVPos);
@@ -163,6 +150,6 @@ void main() {
 		oColor[0] *= vec4(fragVColor.rgb, alpha);
 	#fi
 
-	//oColor[1] = vec4(normal, 1.0);
+	oColor[1] = vec4(normal, 1.0);
 	oColor[2] = vec4(abs(fragVPos), 1.0);
 }

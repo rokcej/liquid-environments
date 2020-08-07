@@ -9,7 +9,7 @@
 	"custom_water": {
 		"description": "Render underwater scene.",
 		"shaders": {
-			"vertex": "water.vert",
+			"vertex": "texture.vert",
 			"fragment": "water.frag"
 		}
 	},
@@ -30,8 +30,15 @@
 	"custom_particles_update": {
 		"description": "Update particles.",
 		"shaders": {
-			"vertex": "particles/particles_update.vert",
+			"vertex": "texture.vert",
 			"fragment": "particles/particles_update.frag"
+		}
+	},
+	"custom_perlin_noise": {
+		"description": "Generate Perlin noise.",
+		"shaders": {
+			"vertex": "texture.vert",
+			"fragment": "perlin_noise.frag"
 		}
 	}
 }
