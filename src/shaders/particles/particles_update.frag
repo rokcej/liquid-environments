@@ -16,7 +16,7 @@ uniform float uDT;
 uniform float uSeed;
 uniform vec3 uCameraPos;
 
-out vec4 write;
+out vec4 oWrite;
 
 struct Particle {
 	vec3 pos;
@@ -66,9 +66,9 @@ Particle readData(int texelOffset) {
 
 void writeData(Particle p, int texelOffset) {
 	if (texelOffset == 0) { // Write position
-		write = vec4(p.pos, p.life);
+		oWrite = vec4(p.pos, p.life);
 	} else { // Write velocity
-		write = vec4(p.vel, p.seed);
+		oWrite = vec4(p.vel, p.seed);
 	}
 }
 
@@ -123,7 +123,7 @@ void main() {
 	if (p.life > 0.0) { // Update particle
 		p.pos += p.vel * uDT;
 	} else { // Respawn particle
-		p.pos = sampleUnitSphere() * 50.0 + uCameraPos;
+		p.pos = sampleUnitSphere() * 20.0 + uCameraPos;
 		p.life = rand() * 25.0 + 5.0;
 		p.vel = vec3(rand(), rand(), rand()) * 0.1 - 0.05;
 	}

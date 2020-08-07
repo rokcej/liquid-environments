@@ -1,10 +1,9 @@
-import * as RC from "/rendercore/src/RenderCore.js"
+import * as RC from "/rendercore/src/RenderCore.js";
 
 class App {
 	constructor(canvas) {
 		// Canvas
 		this.canvas = canvas;
-
 		// Animation timer
 		this.timer = { curr: 0, prev: 0, delta: 0 };
 		// FPS
@@ -32,10 +31,25 @@ class App {
 		//window.requestAnimationFrame(() => { this.update(); });
 	}
 
+	createPhongMat(color, specular, shininess) {
+		if (color === undefined) color = new RC.Color(1, 1, 1);
+		if (specular === undefined) specular = new RC.Color(1, 1, 1);
+		if (shininess === undefined) shininess = 1.0;
+
+		let mat = new RC.CustomShaderMaterial("phong_liquid", {
+			"uLiquidColor": this.liquidColor.toArray(),
+			"uLiquidAtten": this.liquidAtten
+		});
+		mat.color = color;
+		mat.specular = specular;
+		mat.shininess = shininess;
+		return mat;
+	}
 
 	initScene() {
 		/// Main scene
 		this.scene = new RC.Scene();
+		//this.particleScene = new RC.Scene();
 
 		this.camera = new RC.PerspectiveCamera(60, this.canvas.width / this.canvas.height, 0.1, 1000);
 		this.camera.position = new RC.Vector3(0, 0.75, 4);
@@ -45,9 +59,13 @@ class App {
 		this.cameraManager.addFullOrbitCamera(this.camera, new RC.Vector3(0, 0, 0));
 		this.cameraManager.activeCamera = this.camera;
 
+		// Liquid color
+		this.liquidColor = new RC.Color(0.0, 0.18, 0.4);//0, 0.3, 0.7);
+		this.liquidAtten = 0.05;
+
 		// Lights
-		//this.dLight = new RC.DirectionalLight(new RC.Color("#FFFFFF"), 1.0);
-		//this.dLight.position = new RC.Vector3(1.0, 0.5, 0.8);
+		this.dLight = new RC.DirectionalLight(new RC.Color("#FFFFFF"), 1.0);
+		this.dLight.position = new RC.Vector3(1.0, 0.5, 0.8);
 		this.pLight = new RC.PointLight(new RC.Color("#FFFFFF"), 1.0);
 		this.pLight.position = new RC.Vector3(-4.0, 10.0, -20.0);
 		this.pLight2 = new RC.PointLight(new RC.Color("#FFFFFF"), 1.0);
@@ -57,16 +75,13 @@ class App {
 		this.pLight.add(new RC.Cube(1.0, this.pLight.color));
 		this.pLight2.add(new RC.Cube(1.0, this.pLight.color));
 
-		///this.scene.add(this.dLight);
+		//this.scene.add(this.dLight);
 		this.scene.add(this.pLight);
 		this.scene.add(this.pLight2);
 		this.scene.add(this.aLight);
 
 		// Plane
-		let plane = new RC.Quad({x: -32, y: 32}, {x: 32, y: -32}, new RC.MeshPhongMaterial());
-		plane.material.color = new RC.Color("#FFFFFF");
-		plane.material.specular = new RC.Color("#FFFFFF");
-		plane.material.shininess = 1;
+		let plane = new RC.Quad({x: -64, y: 64}, {x: 64, y: -64}, this.createPhongMat());
 		plane.material.side = RC.FRONT_AND_BACK_SIDE;
 
 
@@ -82,6 +97,12 @@ class App {
 
 		plane.material.addMap(texture);
 		this.scene.add(plane);
+
+		let plane2 = new RC.Quad({x: -64, y: 64}, {x: 64, y: -64}, this.createPhongMat());
+		plane2.material.side = RC.FRONT_AND_BACK_SIDE;
+		plane2.material.addMap(texture);
+		plane2.translateZ(-60);
+		this.scene.add(plane2);
 
 		// Texture based particles
 		let n_comp = 2;
@@ -138,18 +159,22 @@ class App {
 		geo.vertices = new RC.BufferAttribute(vertices, 3);
 
 		let mat = new RC.CustomShaderMaterial("particles_draw", { "uvOff": 1.0 / (sz * n_comp) });
+		mat.color = new RC.Color(1, 1, 1);
 		mat.transparent = true;
-		//mat.depthWrite = false;
+		mat.opacity = 1.0;
+		mat.depthWrite = false;
+		mat.depthTest = true;
 		mat.usePoints = true;
-		mat.pointSize = 5.0;
-		mat.lights = false;
+		mat.pointSize = 4.0;
+		mat.lights = true;
 		mat.useClippingPlanes = false;
 		mat.addMap(this.particleTex2);
 
 		this.particleMesh = new RC.Mesh(geo, mat);
 		this.particleMesh.renderingPrimitive = RC.POINTS;
 
-		//this.scene.add(this.particleMesh);
+		this.scene.add(this.particleMesh);
+		// this.particleScene.add(this.particleMesh);
 
 		// Display particle textures
 		let q1 = new RC.Quad({x: -1, y: -.5}, {x: 1, y: .5}, new RC.MeshBasicMaterial());
@@ -168,10 +193,6 @@ class App {
 
 		this.q1 = q1;
 		this.q2 = q2;
-
-		
-		this.particleScene = new RC.Scene();
-		this.particleScene.add(this.particleMesh);
 	}
 
 	initRenderQueue() {
@@ -214,6 +235,8 @@ class App {
 			(textureMap, additionalData) => {
 				this.particleMesh.material.setUniform("uRes", [this.canvas.width, this.canvas.height]);
 				this.particleMesh.material.setUniform("uCameraRange", [this.camera.near, this.camera.far]);
+				this.particleMesh.material.setUniform("uLiquidColor", this.liquidColor.toArray());
+				this.particleMesh.material.setUniform("uLiquidAtten", this.liquidAtten);
 				return { scene: this.particleScene, camera: this.camera };
 			},
 			RC.RenderPass.TEXTURE,
@@ -229,22 +252,31 @@ class App {
 			RC.RenderPass.BASIC,
 			(textureMap, additionalData) => {},
 			(textureMap, additionalData) => {
+				this.particleMesh.material.setUniform("uRes", [this.canvas.width, this.canvas.height]);
+				this.particleMesh.material.setUniform("uCameraRange", [this.camera.near, this.camera.far]);
+				this.particleMesh.material.setUniform("uLiquidColor", this.liquidColor.toArray());
+				this.particleMesh.material.setUniform("uLiquidAtten", this.liquidAtten);
 				return { scene: this.scene, camera: this.camera };
 			},
 			RC.RenderPass.TEXTURE,
 			{ width: this.canvas.width, height: this.canvas.height },
 			"mainDepth",
-			[{
-			  id: "mainColor",
-			  textureConfig: RC.RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG
-			}]
+			[
+				{ id: "mainColor", textureConfig: RC.RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG },
+				{ id: "particleColor", textureConfig: RC.RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG}
+			]
 		);
 
 		this.postRenderPass = new RC.RenderPass(
 			RC.RenderPass.POSTPROCESS,
 			(textureMap, additionalData) => {},
 			(textureMap, additionalData) => {
-				let mat = new RC.CustomShaderMaterial("water");
+				let mat = new RC.CustomShaderMaterial("water", {
+					"uRes": [this.canvas.width, this.canvas.height],
+					"uCameraRange": [this.camera.near, this.camera.far],
+					"uLiquidColor": this.liquidColor.toArray(),
+					"uLiquidAtten": this.liquidAtten,
+				});
 				mat.ligths = false;
 				return { 
 					material: mat,
@@ -262,7 +294,7 @@ class App {
 
 		this.renderQueue.pushRenderPass(this.particleUpdatePass);
 		this.renderQueue.pushRenderPass(this.mainRenderPass);
-		this.renderQueue.pushRenderPass(this.particleDrawPass);
+		//this.renderQueue.pushRenderPass(this.particleDrawPass);
 		this.renderQueue.pushRenderPass(this.postRenderPass);
 
 		this.once = 0;
@@ -280,22 +312,20 @@ class App {
 
 				// Main bunny
 				obj[i].position = new RC.Vector3(0, 0, 0);
-				obj[i].material = new RC.MeshPhongMaterial();
-				obj[i].material.color = new RC.Color("#FFFFFF");
-				obj[i].material.specular = new RC.Color("#FFFFFF");
+				obj[i].material = this.createPhongMat();
 				obj[i].material.shininess = 16;
 
 				obj[i].geometry.drawWireframe = false;
 				this.scene.add(obj[i]);
 
 				// Clone bunnies
-				const count = 5;
+				const count = 8;
 				const space = 4;
 				const colors = Object.values(RC.Color.NAMES);
 
 				for (let x = -(count-1) * space / 2; x <= (count-1) * space / 2; x += space) {
 					for (let z = 0; z >= -(count-1) * space; z -= space) {
-						let clone = new RC.Mesh(obj[i].geometry, new RC.MeshPhongMaterial());
+						let clone = new RC.Mesh(obj[i].geometry, this.createPhongMat());
 						clone.position = new RC.Vector3(x, Math.random() * 8 - 4, z - 2);
 
 						const colorCode = colors[Math.floor(Math.random() * colors.length)];
@@ -377,7 +407,7 @@ class App {
 		// Update render passes
 		this.mainRenderPass.viewport = { width: this.canvas.width, height: this.canvas.height };
 		this.postRenderPass.viewport = { width: this.canvas.width, height: this.canvas.height };
-		this.particleDrawPass.viewport = { width: this.canvas.width, height: this.canvas.height };
+		//this.particleDrawPass.viewport = { width: this.canvas.width, height: this.canvas.height };
 	}
 }
 

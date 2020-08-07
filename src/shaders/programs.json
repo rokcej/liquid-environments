@@ -1,4 +1,11 @@
 {
+	"custom_phong_liquid": {
+		"description": "Phong for scenes submerged in a liquid",
+		"shaders": {
+			"vertex": "phong_liquid.vert",
+			"fragment": "phong_liquid.frag"
+		}
+	},
 	"custom_water": {
 		"description": "Render underwater scene.",
 		"shaders": {

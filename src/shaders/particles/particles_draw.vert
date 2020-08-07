@@ -1,5 +1,5 @@
 #version 300 es
-precision highp float;
+precision mediump float;
 
 uniform mat4 MVMat; // Model View Matrix
 uniform mat4 PMat;  // Projection Matrix
@@ -7,15 +7,25 @@ uniform mat4 PMat;  // Projection Matrix
 in vec3 VPos;       // Vertex position
 
 struct Material {
-	sampler2D texture0;
-    sampler2D texture1;
+    vec3 diffuse;
+
+	#for I_TEX in 0 to NUM_TEX
+		sampler2D texture##I_TEX;
+	#end
 };
+
+#if (TRANSPARENT)
+    uniform float alpha;
+#else
+    float alpha = 1.0;
+#fi
 
 uniform Material material;
 uniform float uvOff;
 
 // Output transformed vertex position
 out vec4 vColor;
+out vec3 vPos;
 out float vProjSize;
 
 uniform float pointSize;
@@ -28,6 +38,9 @@ void main() {
     vec3 pos = texel0.xyz;
     float life = texel0.w;
 
+    // World position
+    vPos = pos;
+
     // Projected position
     vec4 eyePos = MVMat * vec4(pos, 1.0);
     gl_Position = PMat * eyePos;
@@ -38,6 +51,6 @@ void main() {
     gl_PointSize = vProjSize;
 
     // Particle colour
-    float opacity = vProjSize >= 1.0 ? 1.0 : vProjSize;// * vProjSize;
-    vColor = vec4(1.0, 1.0, 1.0, opacity);
+    float opacity = vProjSize >= 1.0 ? 1.0 : vProjSize * vProjSize;
+    vColor = vec4(material.diffuse, opacity * alpha);
 }
