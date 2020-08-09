@@ -25,6 +25,17 @@ struct Particle {
 	float seed;
 };
 
+// Gold Noise by Dominic Cerisano https://stackoverflow.com/a/28095165
+float gold_noise_state = 0.0;
+float gold_noise(vec2 xy, float seed) {
+    return fract(tan(distance(xy * M_PHI, xy) * seed) * xy.x);
+}
+float rand_gold_noise() {
+    float val = gold_noise(gl_FragCoord.xy, uSeed + gold_noise_state);
+	gold_noise_state += val;
+	return val;
+}
+
 // Xorshift https://en.wikipedia.org/wiki/Xorshift
 uint xorshift32_state = 0u;
 uint xorshift32(uint s) {
@@ -34,21 +45,19 @@ uint xorshift32(uint s) {
 	return s;
 }
 
-// Gold Noise by Dominic Cerisano https://stackoverflow.com/a/28095165
-float gold_noise_state = 0.0;
-float gold_noise(vec2 xy, float seed) {
-    return fract(tan(distance(xy * M_PHI, xy) * seed) * xy.x);
-}
-
-float rand2() {
-    float val = gold_noise(gl_FragCoord.xy, uSeed + gold_noise_state);
-	gold_noise_state += val;
-	return val;
-}
-
 float rand() {
 	xorshift32_state = xorshift32(xorshift32_state);
 	return float(xorshift32_state) / float(0xFFFFFFFFu);
+	
+    // float val = gold_noise(gl_FragCoord.xy, uSeed + gold_noise_state);
+	// gold_noise_state += val;
+	// return val;
+}
+
+void srand(float seed) {
+	xorshift32_state = uint(seed * float(0xFFFFFFFFu));
+	
+	// gold_noise_state = seed;
 }
 
 Particle readData(int texelOffset) {
@@ -84,16 +93,6 @@ vec3 sampleUnitSphere() {
 	// } while (length(pos) > 1.0);
 	// return pos;
 
-	// // Non-uniform spherical coordinates
-	// float r = rand();
-	// float phi = rand() * 2.0 * M_PI;
-	// float theta = rand() * M_PI;
-	// return vec3(
-	// 	r * sin(theta) * cos(phi),
-	// 	r * sin(theta) * sin(phi),
-	// 	r * cos(theta)
-	// );
-
 	// Uniform spherical coordinates
 	float u   = rand(); // u ∈ [0, 1]
 	float v   = rand() * 2.0 - 1.0; // v ∈ [-1, 1]
@@ -115,8 +114,7 @@ void main() {
 	Particle p = readData(texelOffset);
 
 	// Init RNG
-	gold_noise_state = (p.seed + uSeed) * 0.5;
-	xorshift32_state = uint(((p.seed + uSeed) * 0.5) * float(0xFFFFFFFFu));
+	srand((p.seed + uSeed) * 0.5);
 
 	// Process particle
 	p.life -= uDT;

@@ -193,8 +193,9 @@ class App {
 			(textureMap, additionalData) => {
 				let mat = new RC.CustomShaderMaterial("perlin_noise", {
 					"uRes": [this.canvas.width, this.canvas.height],
-					"uDT": this.timer.delta,
-					"uSeed": Math.random()
+					"uTime": this.timer.curr,
+					"uPersistence": 0.5,
+					"uLacunarity": 2.0
 				});
 				mat.ligths = false;
 				return { material: mat, textures: [] };
@@ -207,11 +208,11 @@ class App {
 				textureConfig: {
 					wrapS: RC.Texture.ClampToEdgeWrapping,
 					wrapT: RC.Texture.ClampToEdgeWrapping,
-					minFilter: RC.Texture.LinearFilter,
-					magFilter: RC.Texture.LinearFilter,
-					internalFormat: RC.Texture.RGBA,
+					minFilter: RC.Texture.NearestFilter,
+					magFilter: RC.Texture.NearestFilter,
+					internalFormat: RC.Texture.RGBA32F,
 					format: RC.Texture.RGBA,
-					type: RC.Texture.UNSIGNED_BYTE
+					type: RC.Texture.FLOAT
 				}
 			}]
 		);
@@ -301,7 +302,7 @@ class App {
 				mat.ligths = false;
 				return { 
 					material: mat,
-					textures: [textureMap.mainColor, textureMap.mainDepth, textureMap.particleColor, textureMap.particleDepth]
+					textures: [textureMap.mainColor, textureMap.mainDepth, textureMap.particleColor, textureMap.perlinNoise]
 				};
 			},
 			RC.RenderPass.SCREEN,
@@ -428,6 +429,7 @@ class App {
 		this.renderer.updateViewport(this.canvas.width, this.canvas.height);
 
 		// Update render passes
+		this.perlinNoisePass.viewport = { width: this.canvas.width, height: this.canvas.height };
 		this.mainRenderPass.viewport = { width: this.canvas.width, height: this.canvas.height };
 		this.postRenderPass.viewport = { width: this.canvas.width, height: this.canvas.height };
 		this.particleDrawPass.viewport = { width: this.canvas.width, height: this.canvas.height };
