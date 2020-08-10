@@ -61,7 +61,9 @@ class App {
 
 		// Liquid color
 		this.liquidColor = new RC.Color(0.0, 0.18, 0.4); // (0, 0.3, 0.7);
+		this.liquidColor.multiplyScalar(0.5);
 		this.liquidAtten = new RC.Vector3(0.07, 0.06, 0.05);
+		this.liquidAtten.multiplyScalar(1.2);
 
 		// Lights
 		this.dLight = new RC.DirectionalLight(new RC.Color("#FFFFFF"), 1.0);
@@ -102,7 +104,7 @@ class App {
 		let plane2 = new RC.Quad({x: -64, y: 64}, {x: 64, y: -64}, this.createPhongMat());
 		plane2.material.side = RC.FRONT_AND_BACK_SIDE;
 		plane2.material.addMap(texture);
-		plane2.translateZ(-60);
+		plane2.translateZ(-35);
 		this.scene.add(plane2);
 
 		// Texture based particles
@@ -155,7 +157,7 @@ class App {
 		mat.depthWrite = true;
 		mat.depthTest = false;
 		mat.usePoints = true;
-		mat.pointSize = 8.0;
+		mat.pointSize = 6.0;
 		mat.lights = true;
 		mat.addMap(this.particleTex2);
 
@@ -194,6 +196,9 @@ class App {
 				let mat = new RC.CustomShaderMaterial("perlin_noise", {
 					"uRes": [this.canvas.width, this.canvas.height],
 					"uTime": this.timer.curr,
+					"uScale": this.canvas.height / 2.0,
+					"uSpeed": 0.5,
+					"uOctaves": 2,
 					"uPersistence": 0.5,
 					"uLacunarity": 2.0
 				});
@@ -210,7 +215,7 @@ class App {
 					wrapT: RC.Texture.ClampToEdgeWrapping,
 					minFilter: RC.Texture.NearestFilter,
 					magFilter: RC.Texture.NearestFilter,
-					internalFormat: RC.Texture.RGBA32F,
+					internalFormat: RC.Texture.RGBA32F, // WASTE OF MEMORY!!!
 					format: RC.Texture.RGBA,
 					type: RC.Texture.FLOAT
 				}
@@ -251,6 +256,7 @@ class App {
 			RC.RenderPass.BASIC,
 			(textureMap, additionalData) => {
 				this.particleMesh.material.addMap(textureMap.mainDepth);
+				this.particleMesh.material.addMap(textureMap.perlinNoise);
 			},
 			(textureMap, additionalData) => {
 				this.particleMesh.material.setUniform("uRes", [this.canvas.width, this.canvas.height]);

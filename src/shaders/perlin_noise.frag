@@ -5,9 +5,12 @@ precision mediump float;
 
 out vec4 oColor;
 
-uniform vec2 uRes;
+uniform vec2  uRes;
 uniform float uTime;
 
+uniform float uScale;
+uniform float uSpeed;
+uniform int   uOctaves;
 uniform float uPersistence;
 uniform float uLacunarity;
 
@@ -30,12 +33,14 @@ void srand(float seed) {
 
 // Map random number to 2D/3D position
 // https://stackoverflow.com/a/4275343/4808188
-float rand_constant(vec2 xy){ // Original, 2D version
-    return fract(sin(dot(xy, vec2(12.9898, 78.233))) * 43758.5453);
+float rand_constant(vec2 xy) {
+    return fract(sin(dot(xy.xy, vec2(12.9898, 78.233))) * 43758.5453);
 }
-float rand_constant(vec3 xyz){ // Edited, 3D version
-    return fract(sin(dot(xyz, vec3(12.9898, 78.233, 5.1337))) * 43667.146508724461335325378948);
+// http://byteblacksmith.com/improvements-to-the-canonical-one-liner-glsl-rand-for-opengl-es-2-0/
+float rand_constant(vec3 xyz) { // Edited for 3D
+    return fract(sin(mod(dot(xyz.xyz, vec3(12.9898, 78.233, 5.1337)), 3.14)) * 43667.146508724461335325378948);
 }
+
 
 // Random unit-length vector
 vec2 getGradient2D(vec2 ixy) {
@@ -128,16 +133,16 @@ float _perlinNoise3D(vec3 p) {
 // Callable Perlin noise functions
 float perlinNoise2D(vec2 xy, float scale, int octaves) {
 	float octaveAmplitude = 1.0;
-	float octaveScale = scale;
+	float octaveFrequency = 1.0 / scale;
 
 	float noiseSum = 0.0;
 	float amplitudeSum = 0.0;
 	for (int o = 0; o < octaves; ++o) {
-		noiseSum += octaveAmplitude * _perlinNoise2D(xy / octaveScale);
+		noiseSum += octaveAmplitude * _perlinNoise2D(xy * octaveFrequency);
 		amplitudeSum += octaveAmplitude;
 
 		octaveAmplitude *= uPersistence;
-		octaveScale /= uLacunarity;
+		octaveFrequency *= uLacunarity;
 	}
 	noiseSum /= amplitudeSum; // Normalize noise back to [-1, 1]
 
@@ -145,16 +150,17 @@ float perlinNoise2D(vec2 xy, float scale, int octaves) {
 }
 float perlinNoise3D(vec3 xyz, float scale, int octaves) { // 3D
 	float octaveAmplitude = 1.0;
-	float octaveScale = scale;
+	vec3  octaveFrequency = 1.0 / vec3(scale, scale, 1.0);
 
 	float noiseSum = 0.0;
 	float amplitudeSum = 0.0;
 	for (int o = 0; o < octaves; ++o) {
-		noiseSum += octaveAmplitude * _perlinNoise3D(xyz / octaveScale);
+		// Should z (time) be scaled or not?
+		noiseSum += octaveAmplitude * _perlinNoise3D(xyz * octaveFrequency);
 		amplitudeSum += octaveAmplitude;
 
 		octaveAmplitude *= uPersistence;
-		octaveScale /= uLacunarity;
+		octaveFrequency *= uLacunarity;
 	}
 	noiseSum /= amplitudeSum; // Normalize noise back to [-1, 1]
 
@@ -162,10 +168,14 @@ float perlinNoise3D(vec3 xyz, float scale, int octaves) { // 3D
 }
 
 void main() {
-	vec2 uv = gl_FragCoord.xy / uRes;
+	vec3 xyz = vec3(gl_FragCoord.xy - 0.5 * uRes, uTime * uSpeed);
 
-	//float val = perlinNoise2D(gl_FragCoord.xy, 200.0, 3);
-	float val = perlinNoise3D(vec3(gl_FragCoord.xy, uTime * 200.0), 200.0, 3);
-	
+	// // Reset time after 10 hours to avoid RNG malfunction
+	// if (xyz.z > 36000.0)
+	// xyz.z -= 36000.0;
+
+	//float val = perlinNoise2D(xyz.xy, uScale, uOctaves);
+	float val = perlinNoise3D(xyz, uScale, uOctaves);
+
 	oColor = vec4(vec3(val), 1.0);
 }

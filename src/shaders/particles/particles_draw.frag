@@ -40,7 +40,11 @@ float linearizeDepth(float z_buf) {
     return (2.0 * uCameraRange.x * uCameraRange.y) / (uCameraRange.y + uCameraRange.x - z_ndc * (uCameraRange.y - uCameraRange.x));
 }
 
-vec3 applyFog(vec3 color, float depth) {
+vec3 applyFog(vec3 color, float depth, float noise) {
+	depth += (noise * 2.0 - 1.0) * 10.0;
+	if (depth < 0.0)
+	 	depth = 0.0;
+
 	// Beer's law
 	vec3 transmittance = exp(-uLiquidAtten * depth);
 
@@ -100,7 +104,10 @@ void main() {
 			illum += calcLight(lights[##lightIdx]);
 		#end
 	#fi
+
+	// Perlin noise
+	float noise = texture(material.texture2, uv).r;
 	
 	// Color
-	oColor = vec4(applyFog(vColor.rgb * illum, currentDepth), vColor.a * opacity);
+	oColor = vec4(applyFog(vColor.rgb * illum, currentDepth, noise), vColor.a * opacity);
 }
