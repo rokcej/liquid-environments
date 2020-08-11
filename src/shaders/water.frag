@@ -15,10 +15,15 @@ uniform vec2 uCameraRange; // Camera near & far values
 uniform vec3 uLiquidColor;
 uniform vec3 uLiquidAtten;
 
+uniform vec3 uCameraPos;
+uniform vec3 uCameraDir;
+
 in vec2 fragUV;
 
-out vec4 oColor;
+in vec3 vFragDir;
 
+
+out vec4 oColor;
 
 float linearizeDepth(float z_buf) {
 	float z_ndc = z_buf * 2.0 - 1.0; 
@@ -26,16 +31,22 @@ float linearizeDepth(float z_buf) {
 }
 
 vec3 applyFog(vec3 colorBuf, float depthBuf, float noise) {
+	// Linearize depth buffer value
 	float depth = linearizeDepth(depthBuf);
+	// Get actual distance from camera
+	vec3 fragDir = normalize(vFragDir);
+	depth /= dot(fragDir, uCameraDir);
 
-	depth += (noise * 2.0 - 1.0) * 10.0;
-	if (depth < 0.0)
-	 	depth = 0.0;
-	
-	vec3 atten = uLiquidAtten; // * (1.0 + (noise * 2.0 - 1.0) * 3.0);
+	/*vec3 fragPos = depth * fragDir + uCameraPos;
+	float y0 = max(min(uCameraPos.y, 6.0), -4.0);
+	float y1 = max(min(fragPos.y, 6.0), -4.0);
+	float integral = 6.0 * y1 - y1 * y1 * 0.5 - 6.0 * y0 + y0 * y0 * 0.5;
+	float F = depth / (fragPos.y - uCameraPos.y) * 0.02 * integral;
+	float fog = exp(-F);
+	return colorBuf * fog + vec3(1.0) * (1.0 - fog);*/
 
 	// Beer's law
-	vec3 transmittance = exp(-atten * depth);
+	vec3 transmittance = exp(-uLiquidAtten * depth * noise);
 	vec3 color = colorBuf * transmittance;
 
 	// Mix with background color

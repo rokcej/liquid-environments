@@ -8,6 +8,7 @@ out vec4 oColor;
 uniform vec2  uRes;
 uniform float uTime;
 
+uniform float uContrast;
 uniform float uScale;
 uniform float uSpeed;
 uniform int   uOctaves;
@@ -146,7 +147,7 @@ float perlinNoise2D(vec2 xy, float scale, int octaves) {
 	}
 	noiseSum /= amplitudeSum; // Normalize noise back to [-1, 1]
 
-	return (noiseSum + 1.0) * 0.5; // Convert to range [0, 1]
+	return (noiseSum * uContrast + 1.0) * 0.5; // Convert to range [0, 1]
 }
 float perlinNoise3D(vec3 xyz, float scale, int octaves) { // 3D
 	float octaveAmplitude = 1.0;
@@ -164,7 +165,7 @@ float perlinNoise3D(vec3 xyz, float scale, int octaves) { // 3D
 	}
 	noiseSum /= amplitudeSum; // Normalize noise back to [-1, 1]
 
-	return (noiseSum + 1.0) * 0.5; // Convert to range [0, 1]
+	return (noiseSum * uContrast + 1.0) * 0.5; // Convert to range [0, 1]
 }
 
 void main() {
@@ -177,5 +178,5 @@ void main() {
 	//float val = perlinNoise2D(xyz.xy, uScale, uOctaves);
 	float val = perlinNoise3D(xyz, uScale, uOctaves);
 
-	oColor = vec4(vec3(val), 1.0);
+	oColor = vec4(vec3(clamp(val, 0.0, 1.0)), 1.0);
 }

@@ -22,13 +22,14 @@ struct Material {
 
 uniform Material material;
 uniform float uvOff;
+uniform float pointSize;
 
 // Output transformed vertex position
 out vec4 vColor;
 out vec3 vPos;
 out float vProjSize;
+out float vDepthDist;
 
-uniform float pointSize;
 
 void main() {
     // Data
@@ -52,4 +53,5 @@ void main() {
     float opacity = vProjSize >= 1.0 ? 1.0 : vProjSize * vProjSize;
     
     vColor = vec4(material.diffuse, opacity * alpha);
+    vDepthDist = length(vPos);
 }

@@ -32,6 +32,7 @@ uniform vec3 uLiquidAtten;
 in vec4 vColor;
 in vec3 vPos;
 in float vProjSize;
+in float vDepthDist;
 
 out vec4 oColor;
 
@@ -41,12 +42,8 @@ float linearizeDepth(float z_buf) {
 }
 
 vec3 applyFog(vec3 color, float depth, float noise) {
-	depth += (noise * 2.0 - 1.0) * 10.0;
-	if (depth < 0.0)
-	 	depth = 0.0;
-
 	// Beer's law
-	vec3 transmittance = exp(-uLiquidAtten * depth);
+	vec3 transmittance = exp(-uLiquidAtten * depth * noise);
 
 	return color * transmittance; // + uLiquidColor * (1.0 - transmittance.b);
 }
@@ -109,5 +106,5 @@ void main() {
 	float noise = texture(material.texture2, uv).r;
 	
 	// Color
-	oColor = vec4(applyFog(vColor.rgb * illum, currentDepth, noise), vColor.a * opacity);
+	oColor = vec4(applyFog(vColor.rgb * illum, vDepthDist, noise), vColor.a * opacity);
 }

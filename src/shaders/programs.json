@@ -9,7 +9,7 @@
 	"custom_water": {
 		"description": "Render underwater scene.",
 		"shaders": {
-			"vertex": "texture.vert",
+			"vertex": "water.vert",
 			"fragment": "water.frag"
 		}
 	},

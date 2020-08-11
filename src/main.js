@@ -54,6 +54,7 @@ class App {
 		this.camera = new RC.PerspectiveCamera(60, this.canvas.width / this.canvas.height, 0.1, 1000);
 		this.camera.position = new RC.Vector3(0, 0.75, 4);
 		this.camera.lookAt(new RC.Vector3(0, 0, 0), new RC.Vector3(0, 1, 0));
+		this.PMatInv = new RC.Matrix4().getInverse(this.camera.projectionMatrix);
 		
 		this.cameraManager = new RC.CameraManager();
 		this.cameraManager.addFullOrbitCamera(this.camera, new RC.Vector3(0, 0, 0));
@@ -63,7 +64,7 @@ class App {
 		this.liquidColor = new RC.Color(0.0, 0.18, 0.4); // (0, 0.3, 0.7);
 		this.liquidColor.multiplyScalar(0.5);
 		this.liquidAtten = new RC.Vector3(0.07, 0.06, 0.05);
-		this.liquidAtten.multiplyScalar(1.2);
+		this.liquidAtten.multiplyScalar(1.8);
 
 		// Lights
 		this.dLight = new RC.DirectionalLight(new RC.Color("#FFFFFF"), 1.0);
@@ -174,14 +175,14 @@ class App {
 		q1.material.side = RC.Material.FRONT_AND_BACK_SIDE;
 		q1.material.color = new RC.Color("#FFFFFF");
 		q1.material.addMap(this.particleTex2);
-		this.scene.add(q1);
+		//this.scene.add(q1);
 
 		let q2 = new RC.Quad({x: -1, y: -.5}, {x: 1, y: .5}, new RC.MeshBasicMaterial());
 		q2.position = new RC.Vector3(3,0,-2);
 		q2.material.side = RC.Material.FRONT_AND_BACK_SIDE;
 		q2.material.color = new RC.Color("#FFFFFF");
 		q2.material.addMap(this.particleTex2);
-		this.scene.add(q2);
+		//this.scene.add(q2);
 
 		this.q1 = q1;
 		this.q2 = q2;
@@ -197,6 +198,7 @@ class App {
 					"uRes": [this.canvas.width, this.canvas.height],
 					"uTime": this.timer.curr,
 					"uScale": this.canvas.height / 2.0,
+					"uContrast": 1.0,
 					"uSpeed": 0.5,
 					"uOctaves": 2,
 					"uPersistence": 0.5,
@@ -299,7 +301,12 @@ class App {
 			RC.RenderPass.POSTPROCESS,
 			(textureMap, additionalData) => {},
 			(textureMap, additionalData) => {
+				let VPMatInv = new RC.Matrix4().multiplyMatrices(this.camera.matrixWorld, this.PMatInv);
+
 				let mat = new RC.CustomShaderMaterial("water", {
+					"uCameraPos": this.camera.position.toArray(),
+					"uCameraDir": new RC.Vector3(0,0,-1).applyEuler(this.camera.rotation).toArray(),
+					"uVPMatInv": VPMatInv.toArray(),
 					"uRes": [this.canvas.width, this.canvas.height],
 					"uCameraRange": [this.camera.near, this.camera.far],
 					"uLiquidColor": this.liquidColor.toArray(),
@@ -432,6 +439,7 @@ class App {
 	
 		// Update aspect ratio and viewport
 		this.camera.aspect = this.canvas.width / this.canvas.height;
+		this.PMatInv.getInverse(this.camera.projectionMatrix);
 		this.renderer.updateViewport(this.canvas.width, this.canvas.height);
 
 		// Update render passes
