@@ -190,6 +190,17 @@ class App {
 
 	initRenderQueue() {
 		// NOISE
+
+		let RGBA32FCONFIG = {
+			wrapS: RC.Texture.ClampToEdgeWrapping,
+			wrapT: RC.Texture.ClampToEdgeWrapping,
+			minFilter: RC.Texture.NearestFilter,
+			magFilter: RC.Texture.NearestFilter,
+			internalFormat: RC.Texture.RGBA32F, // WASTE OF MEMORY!!!
+			format: RC.Texture.RGBA,
+			type: RC.Texture.FLOAT
+		};
+
 		this.perlinNoisePass = new RC.RenderPass(
 			RC.RenderPass.POSTPROCESS,
 			(textureMap, additionalData) => {},
@@ -209,7 +220,7 @@ class App {
 			},
 			RC.RenderPass.TEXTURE,
 			{ width: this.canvas.width, height: this.canvas.height },
-			"dummy0",
+			"dummy",
 			[{
 				id: "perlinNoise",
 				textureConfig: {
@@ -257,7 +268,7 @@ class App {
 		this.particleDrawPass = new RC.RenderPass(
 			RC.RenderPass.BASIC,
 			(textureMap, additionalData) => {
-				this.particleMesh.material.addMap(textureMap.mainDepth);
+				this.particleMesh.material.addMap(textureMap.mainDepthDist);
 				this.particleMesh.material.addMap(textureMap.perlinNoise);
 			},
 			(textureMap, additionalData) => {
@@ -291,9 +302,91 @@ class App {
 			},
 			RC.RenderPass.TEXTURE,
 			{ width: this.canvas.width, height: this.canvas.height },
-			"mainDepth",
+			"mainDepthBuf",
 			[
 				{ id: "mainColor", textureConfig: RC.RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG }
+			]
+		);
+		// DEPTH
+		this.depthPass = new RC.RenderPass(
+			RC.RenderPass.POSTPROCESS,
+			(textureMap, additionalData) => {},
+			(textureMap, additionalData) => {
+				let VPMatInv = new RC.Matrix4().multiplyMatrices(this.camera.matrixWorld, this.PMatInv);
+
+				let mat = new RC.CustomShaderMaterial("depth_distance", {
+					"uVPMatInv": VPMatInv.toArray(),
+					"uCameraPos": this.camera.position.toArray(),
+					"uCameraDir": new RC.Vector3(0,0,-1).applyEuler(this.camera.rotation).toArray(),
+					"uCameraRange": [this.camera.near, this.camera.far]
+				});
+				mat.ligths = false;
+				return { 
+					material: mat,
+					textures: [textureMap.mainDepthBuf]
+				};
+			},
+			RC.RenderPass.TEXTURE,
+			{ width: this.canvas.width, height: this.canvas.height },
+			"dummy",
+			[
+				{ id: "mainDepthDist", textureConfig: RGBA32FCONFIG }
+			]
+		);
+		// DOF
+		this.cocPass = new RC.RenderPass(
+			RC.RenderPass.POSTPROCESS,
+			(textureMap, additionalData) => {},
+			(textureMap, additionalData) => {
+				let mat = new RC.CustomShaderMaterial("coc", {});
+				mat.ligths = false;
+				return { 
+					material: mat,
+					textures: [textureMap.mainColor, textureMap.mainDepthDist]
+				};
+			},
+			RC.RenderPass.TEXTURE,
+			{ width: this.canvas.width, height: this.canvas.height },
+			"dummy",
+			[
+				{ id: "coc", textureConfig: RGBA32FCONFIG }
+			]
+		);
+		// GAUSS
+		this.gaussPassHor = new RC.RenderPass(
+			RC.RenderPass.POSTPROCESS,
+			(textureMap, additionalData) => {},
+			(textureMap, additionalData) => {
+				let mat = new RC.CustomShaderMaterial("gaussian_blur", { "horizontal": true });
+				mat.ligths = false;
+				return { 
+					material: mat,
+					textures: [textureMap.coc]
+				};
+			},
+			RC.RenderPass.TEXTURE,
+			{ width: this.canvas.width, height: this.canvas.height },
+			"dummy",
+			[
+				{ id: "cocTemp", textureConfig: RGBA32FCONFIG }
+			]
+		);
+		this.gaussPassVert = new RC.RenderPass(
+			RC.RenderPass.POSTPROCESS,
+			(textureMap, additionalData) => {},
+			(textureMap, additionalData) => {
+				let mat = new RC.CustomShaderMaterial("gaussian_blur", { "horizontal": false });
+				mat.ligths = false;
+				return { 
+					material: mat,
+					textures: [textureMap.cocTemp]
+				};
+			},
+			RC.RenderPass.TEXTURE,
+			{ width: this.canvas.width, height: this.canvas.height },
+			"dummy",
+			[
+				{ id: "coc", textureConfig: RGBA32FCONFIG }
 			]
 		);
 		// POST
@@ -301,21 +394,20 @@ class App {
 			RC.RenderPass.POSTPROCESS,
 			(textureMap, additionalData) => {},
 			(textureMap, additionalData) => {
-				let VPMatInv = new RC.Matrix4().multiplyMatrices(this.camera.matrixWorld, this.PMatInv);
-
 				let mat = new RC.CustomShaderMaterial("water", {
-					"uCameraPos": this.camera.position.toArray(),
-					"uCameraDir": new RC.Vector3(0,0,-1).applyEuler(this.camera.rotation).toArray(),
-					"uVPMatInv": VPMatInv.toArray(),
-					"uRes": [this.canvas.width, this.canvas.height],
-					"uCameraRange": [this.camera.near, this.camera.far],
 					"uLiquidColor": this.liquidColor.toArray(),
 					"uLiquidAtten": this.liquidAtten.toArray(),
 				});
 				mat.ligths = false;
 				return { 
 					material: mat,
-					textures: [textureMap.mainColor, textureMap.mainDepth, textureMap.particleColor, textureMap.perlinNoise]
+					textures: [
+						textureMap.mainColor,
+						textureMap.mainDepthDist,
+						textureMap.particleColor,
+						textureMap.perlinNoise,
+						textureMap.coc
+					]
 				};
 			},
 			RC.RenderPass.SCREEN,
@@ -329,6 +421,10 @@ class App {
 
 		this.renderQueue.pushRenderPass(this.perlinNoisePass);
 		this.renderQueue.pushRenderPass(this.mainRenderPass);
+		this.renderQueue.pushRenderPass(this.depthPass);
+		this.renderQueue.pushRenderPass(this.cocPass);
+		this.renderQueue.pushRenderPass(this.gaussPassHor);
+		this.renderQueue.pushRenderPass(this.gaussPassVert);
 		this.renderQueue.pushRenderPass(this.particleUpdatePass);
 		this.renderQueue.pushRenderPass(this.particleDrawPass);
 		this.renderQueue.pushRenderPass(this.postRenderPass);
@@ -445,6 +541,10 @@ class App {
 		// Update render passes
 		this.perlinNoisePass.viewport = { width: this.canvas.width, height: this.canvas.height };
 		this.mainRenderPass.viewport = { width: this.canvas.width, height: this.canvas.height };
+		this.depthPass.viewport = { width: this.canvas.width, height: this.canvas.height };
+		this.cocPass.viewport = { width: this.canvas.width, height: this.canvas.height };
+		this.gaussPassHor.viewport = { width: this.canvas.width, height: this.canvas.height };
+		this.gaussPassVert.viewport = { width: this.canvas.width, height: this.canvas.height };
 		this.postRenderPass.viewport = { width: this.canvas.width, height: this.canvas.height };
 		this.particleDrawPass.viewport = { width: this.canvas.width, height: this.canvas.height };
 	}

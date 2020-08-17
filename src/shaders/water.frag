@@ -9,34 +9,15 @@ struct Material {
 
 uniform Material material;
 
-uniform vec2 uRes; // Viewport resolution
-uniform vec2 uCameraRange; // Camera near & far values
-
 uniform vec3 uLiquidColor;
 uniform vec3 uLiquidAtten;
 
-uniform vec3 uCameraPos;
-uniform vec3 uCameraDir;
-
 in vec2 fragUV;
-
-in vec3 vFragDir;
 
 
 out vec4 oColor;
 
-float linearizeDepth(float z_buf) {
-	float z_ndc = z_buf * 2.0 - 1.0; 
-    return (2.0 * uCameraRange.x * uCameraRange.y) / (uCameraRange.y + uCameraRange.x - z_ndc * (uCameraRange.y - uCameraRange.x));
-}
-
-vec3 applyFog(vec3 colorBuf, float depthBuf, float noise) {
-	// Linearize depth buffer value
-	float depth = linearizeDepth(depthBuf);
-	// Get actual distance from camera
-	vec3 fragDir = normalize(vFragDir);
-	depth /= dot(fragDir, uCameraDir);
-
+vec3 applyFog(vec3 color, float depth, float noise) {
 	/*vec3 fragPos = depth * fragDir + uCameraPos;
 	float y0 = max(min(uCameraPos.y, 6.0), -4.0);
 	float y1 = max(min(fragPos.y, 6.0), -4.0);
@@ -47,7 +28,7 @@ vec3 applyFog(vec3 colorBuf, float depthBuf, float noise) {
 
 	// Beer's law
 	vec3 transmittance = exp(-uLiquidAtten * depth * noise);
-	vec3 color = colorBuf * transmittance;
+	color *= transmittance;
 
 	// Mix with background color
 	color += uLiquidColor * (1.0 - transmittance.b);
@@ -59,7 +40,7 @@ void main() {
 	vec3 mainColor = texture(material.texture0, fragUV).rgb;
 	float mainDepth = texture(material.texture1, fragUV).r;
 	float noise = texture(material.texture3, fragUV).r;
-	mainColor = applyFog(mainColor, mainDepth, noise);
+	//mainColor = applyFog(mainColor, mainDepth, noise);
 
 	vec3 particleColor = texture(material.texture2, fragUV).rgb;
 	//float particleAlpha = texture(material.texture2, fragUV).a;
@@ -67,11 +48,11 @@ void main() {
 	//particleColor = applyFog(particleColor, particleDepth, true);
 
 	//oColor = vec4(mix(mainColor, particleColor, particleAlpha), 1.0);
-	oColor = vec4(mainColor + particleColor, 1.0);
+	//oColor = vec4(mainColor + particleColor, 1.0);
 	
 	//oColor = vec4(mainColor, 1.0);
 	//oColor = vec4(particleColor, 1.0);
-	//oColor = texture(material.texture3, fragUV);
+	oColor = texture(material.texture4, fragUV);
 
 	// // Gamma correction
 	// float gamma = 2.2;

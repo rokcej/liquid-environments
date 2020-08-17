@@ -9,7 +9,7 @@
 	"custom_water": {
 		"description": "Render underwater scene.",
 		"shaders": {
-			"vertex": "water.vert",
+			"vertex": "texture.vert",
 			"fragment": "water.frag"
 		}
 	},
@@ -39,6 +39,27 @@
 		"shaders": {
 			"vertex": "texture.vert",
 			"fragment": "perlin_noise.frag"
+		}
+	},
+	"custom_coc": {
+		"description": "Generate circles of confusion.",
+		"shaders": {
+			"vertex": "texture.vert",
+			"fragment": "dof/coc.frag"
+		}
+	},
+	"custom_depth_distance": {
+		"description": "Get actual depth distance.",
+		"shaders": {
+			"vertex": "depth_distance.vert",
+			"fragment": "depth_distance.frag"
+		}
+	},
+	"custom_gaussian_blur": {
+		"description": "Gaussian blur.",
+		"shaders": {
+			"vertex": "texture.vert",
+			"fragment": "gaussian_blur.frag"
 		}
 	}
 }

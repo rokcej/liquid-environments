@@ -36,11 +36,6 @@ in float vDepthDist;
 
 out vec4 oColor;
 
-float linearizeDepth(float z_buf) {
-	float z_ndc = z_buf * 2.0 - 1.0; 
-    return (2.0 * uCameraRange.x * uCameraRange.y) / (uCameraRange.y + uCameraRange.x - z_ndc * (uCameraRange.y - uCameraRange.x));
-}
-
 vec3 applyFog(vec3 color, float depth, float noise) {
 	// Beer's law
 	vec3 transmittance = exp(-uLiquidAtten * depth * noise);
@@ -69,7 +64,7 @@ void main() {
 
 	// Depth test
 	vec2 uv = gl_FragCoord.xy / uRes;
-	float currentDepth = gl_FragCoord.z;
+	float currentDepth = vDepthDist;
 	float closestDepth = texture(material.texture1, uv).r;
 
 	// Manual depth test
@@ -77,8 +72,6 @@ void main() {
 		discard;
 
 	// Smooth particle transition
-	closestDepth = linearizeDepth(closestDepth);
-	currentDepth = linearizeDepth(currentDepth);
 	float transitionSize = 0.02;
 	float depthDiff = clamp(closestDepth - currentDepth, 0.0, 1.0);
 	opacity *= smoothstep(0.0, transitionSize, depthDiff);
@@ -106,5 +99,5 @@ void main() {
 	float noise = texture(material.texture2, uv).r;
 	
 	// Color
-	oColor = vec4(applyFog(vColor.rgb * illum, vDepthDist, noise), vColor.a * opacity);
+	oColor = vec4(applyFog(vColor.rgb * illum, currentDepth, noise), vColor.a * opacity);
 }
