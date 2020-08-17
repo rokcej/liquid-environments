@@ -16,7 +16,7 @@
 	"custom_post": {
 		"description": "Post processing.",
 		"shaders": {
-			"vertex": "post.vert",
+			"vertex": "texture.vert",
 			"fragment": "post.frag"
 		}
 	},
@@ -41,11 +41,32 @@
 			"fragment": "perlin_noise.frag"
 		}
 	},
-	"custom_coc": {
-		"description": "Generate circles of confusion.",
+	"custom_dof_downsample_near": {
+		"description": "DOF 1.",
 		"shaders": {
 			"vertex": "texture.vert",
-			"fragment": "dof/coc.frag"
+			"fragment": "dof/downsample_near.frag"
+		}
+	},
+	"custom_dof_coc_near": {
+		"description": "DOF 2.",
+		"shaders": {
+			"vertex": "texture.vert",
+			"fragment": "dof/coc_near.frag"
+		}
+	},
+	"custom_dof_small_blur": {
+		"description": "DOF 3.",
+		"shaders": {
+			"vertex": "texture.vert",
+			"fragment": "dof/small_blur.frag"
+		}
+	},
+	"custom_dof": {
+		"description": "DOF 4.",
+		"shaders": {
+			"vertex": "texture.vert",
+			"fragment": "dof/dof.frag"
 		}
 	},
 	"custom_depth_distance": {

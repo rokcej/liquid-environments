@@ -1,14 +1,11 @@
 #version 300 es
 precision mediump float;
 
-
 struct Material {
-    #if (TEXTURE)
-        sampler2D texture0;
-        sampler2D texture1;
-    #fi
+	#for I_TEX in 0 to NUM_TEX
+		sampler2D texture##I_TEX;
+	#end
 };
-
 
 uniform Material material;
 
@@ -16,24 +13,12 @@ uniform Material material;
     in vec2 fragUV;
 #fi
 
-out vec4 color;
+out vec4 oColor;
 
 
 void main() {
-	#if (TEXTURE)
+	vec3 tex0 = texture(material.texture0, fragUV).rgb;
+	vec3 tex1 = texture(material.texture1, fragUV).rgb;
 
-		const float gamma = 2.2;
-		const float exposure = 2.0;
-		vec3 originalColor = texture(material.texture1, fragUV).rgb;
-		vec3 bloomColor = texture(material.texture0, fragUV).rgb;
-		originalColor += bloomColor; // additive blending
-
-		// tone mapping
-		vec3 result = vec3(1.0) - exp(-originalColor * exposure);
-
-		// gamma correction
-		result = pow(result, vec3(1.0 / gamma));
-
-		color = vec4(result, 1.0);
-	#fi
+	oColor = vec4(tex0 + tex1, 1.0);
 }

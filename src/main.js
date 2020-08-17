@@ -15,9 +15,18 @@ class App {
 		this.renderer.addShaderLoaderUrls("/rendercore/src/shaders");
 		this.renderer.addShaderLoaderUrls("/src/shaders");
 		
+		this.gl = this.renderer._gl;
+
 		this.keyboardInput = RC.KeyboardInput.instance;
 		this.mouseInput = RC.MouseInput.instance;
 		this.mouseInput.setSourceObject(window);
+
+		this.dof = {
+			f: 16.0, // Focal length
+			a: 0.5, // Aperture radius
+			v0: 4.0, // Distance in focus
+			numPasses: 2
+		}
 
 		this.initScene();
 		this.initRenderQueue();
@@ -189,18 +198,18 @@ class App {
 	}
 
 	initRenderQueue() {
-		// NOISE
 
-		let RGBA32FCONFIG = {
+		let RGBA16F_LINEAR = {
 			wrapS: RC.Texture.ClampToEdgeWrapping,
 			wrapT: RC.Texture.ClampToEdgeWrapping,
-			minFilter: RC.Texture.NearestFilter,
-			magFilter: RC.Texture.NearestFilter,
-			internalFormat: RC.Texture.RGBA32F, // WASTE OF MEMORY!!!
+			minFilter: RC.Texture.LinearFilter,
+			magFilter: RC.Texture.LinearFilter,
+			internalFormat: RC.Texture.RGBA16F, // WASTE OF MEMORY!!!
 			format: RC.Texture.RGBA,
 			type: RC.Texture.FLOAT
 		};
 
+		// NOISE
 		this.perlinNoisePass = new RC.RenderPass(
 			RC.RenderPass.POSTPROCESS,
 			(textureMap, additionalData) => {},
@@ -276,6 +285,10 @@ class App {
 				this.particleMesh.material.setUniform("uCameraRange", [this.camera.near, this.camera.far]);
 				this.particleMesh.material.setUniform("uLiquidColor", this.liquidColor.toArray());
 				this.particleMesh.material.setUniform("uLiquidAtten", this.liquidAtten.toArray());
+				
+				this.particleMesh.material.setUniform("f", this.dof.f);
+				this.particleMesh.material.setUniform("a", this.dof.a);
+				this.particleMesh.material.setUniform("v0", this.dof.v0);
 
 				// for (let l of this.lights)
 				// 	this.particleScene.add(l);
@@ -330,67 +343,168 @@ class App {
 			{ width: this.canvas.width, height: this.canvas.height },
 			"dummy",
 			[
-				{ id: "mainDepthDist", textureConfig: RGBA32FCONFIG }
+				{ id: "mainDepthDist", textureConfig: RGBA16F_LINEAR }
 			]
 		);
 		// DOF
+		this.dofDownsamplePass = new RC.RenderPass(
+			RC.RenderPass.POSTPROCESS,
+			(textureMap, additionalData) => {},
+			(textureMap, additionalData) => {
+				// TODO: Cleanup / optimize
+				// Get the depth camera is looking at
+				if (this.fboDepth === undefined) {
+					this.fboDepth = this.gl.createFramebuffer();
+					this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.fboDepth);
+					
+					let texture = this.renderer._glManager._textureManager._cached_textures.get(textureMap.mainDepthDist);
+					this.gl.framebufferTexture2D(
+						this.gl.FRAMEBUFFER, this.gl.COLOR_ATTACHMENT0,
+						this.gl.TEXTURE_2D, texture, 0
+					);
+					// Check if you can read from this type of texture.
+					let canRead = (this.gl.checkFramebufferStatus(this.gl.FRAMEBUFFER) == this.gl.FRAMEBUFFER_COMPLETE);
+					if (!canRead)
+						throw "Unable to read depth framebuffer!";
+				} else {
+					this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.fboDepth);
+				}
+
+				let pixel = new Float32Array(4);
+				this.gl.readPixels(Math.trunc(this.canvas.width / 2), Math.trunc(this.canvas.height / 2), 1, 1, this.gl.RGBA, this.gl.FLOAT, pixel);
+				// Unbind the framebuffer
+				this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+
+				let depth = pixel[0];
+				let diff = this.dof.v0 - depth;
+				if (Math.abs(diff) > 0.00001);
+					this.dof.v0 -= diff * this.timer.delta * 2.0;
+
+
+
+				let mat = new RC.CustomShaderMaterial("dof_downsample_near", {
+					"uSrcResInv": [1.0 / this.canvas.width, 1.0 / this.canvas.height],
+					"f": this.dof.f,
+					"a": this.dof.a,
+					"v0": this.dof.v0
+				});
+				mat.ligths = false;
+				return { 
+					material: mat,
+					textures: [textureMap.water, textureMap.mainDepthDist]
+				};
+			},
+			RC.RenderPass.TEXTURE,
+			{ width: this.canvas.width * 0.25, height: this.canvas.height * 0.25 },
+			"dummy4x4",
+			[
+				{ id: "downsampled", textureConfig: RGBA16F_LINEAR }
+			]
+		);
 		this.cocPass = new RC.RenderPass(
 			RC.RenderPass.POSTPROCESS,
 			(textureMap, additionalData) => {},
 			(textureMap, additionalData) => {
-				let mat = new RC.CustomShaderMaterial("coc", {});
+				let mat = new RC.CustomShaderMaterial("dof_coc_near", {});
 				mat.ligths = false;
 				return { 
 					material: mat,
-					textures: [textureMap.mainColor, textureMap.mainDepthDist]
+					textures: [textureMap.downsampled, textureMap.blurred]
+				};
+			},
+			RC.RenderPass.TEXTURE,
+			{ width: this.canvas.width * 0.25, height: this.canvas.height * 0.25 },
+			"dummy4x4",
+			[
+				{ id: "coc_near", textureConfig: RGBA16F_LINEAR }
+			]
+		);
+		this.dofSmallBlurPass = new RC.RenderPass(
+			RC.RenderPass.POSTPROCESS,
+			(textureMap, additionalData) => {},
+			(textureMap, additionalData) => {
+				let mat = new RC.CustomShaderMaterial("dof_small_blur", {
+					"uResInv": [4.0 / this.canvas.width, 4.0 / this.canvas.height]
+				});
+				mat.ligths = false;
+				return { 
+					material: mat,
+					textures: [textureMap.coc_near]
+				};
+			},
+			RC.RenderPass.TEXTURE,
+			{ width: this.canvas.width * 0.25, height: this.canvas.height * 0.25 },
+			"dummy4x4",
+			[
+				{ id: "small_blur", textureConfig: RGBA16F_LINEAR }
+			]
+		);
+		this.dofPass = new RC.RenderPass(
+			RC.RenderPass.POSTPROCESS,
+			(textureMap, additionalData) => {},
+			(textureMap, additionalData) => {
+				let mat = new RC.CustomShaderMaterial("dof", {	
+					"uResInv": [1.0 / this.canvas.width, 1.0 / this.canvas.height],
+					"f": this.dof.f,
+					"a": this.dof.a,
+					"v0": this.dof.v0
+				});
+				mat.ligths = false;
+				return { 
+					material: mat,
+					textures: [textureMap.water, textureMap.mainDepthDist, textureMap.blurred, textureMap.small_blur]
 				};
 			},
 			RC.RenderPass.TEXTURE,
 			{ width: this.canvas.width, height: this.canvas.height },
 			"dummy",
 			[
-				{ id: "coc", textureConfig: RGBA32FCONFIG }
+				{ id: "dof", textureConfig: RGBA16F_LINEAR }
 			]
 		);
 		// GAUSS
-		this.gaussPassHor = new RC.RenderPass(
-			RC.RenderPass.POSTPROCESS,
-			(textureMap, additionalData) => {},
-			(textureMap, additionalData) => {
-				let mat = new RC.CustomShaderMaterial("gaussian_blur", { "horizontal": true });
-				mat.ligths = false;
-				return { 
-					material: mat,
-					textures: [textureMap.coc]
-				};
-			},
-			RC.RenderPass.TEXTURE,
-			{ width: this.canvas.width, height: this.canvas.height },
-			"dummy",
-			[
-				{ id: "cocTemp", textureConfig: RGBA32FCONFIG }
-			]
-		);
-		this.gaussPassVert = new RC.RenderPass(
-			RC.RenderPass.POSTPROCESS,
-			(textureMap, additionalData) => {},
-			(textureMap, additionalData) => {
-				let mat = new RC.CustomShaderMaterial("gaussian_blur", { "horizontal": false });
-				mat.ligths = false;
-				return { 
-					material: mat,
-					textures: [textureMap.cocTemp]
-				};
-			},
-			RC.RenderPass.TEXTURE,
-			{ width: this.canvas.width, height: this.canvas.height },
-			"dummy",
-			[
-				{ id: "coc", textureConfig: RGBA32FCONFIG }
-			]
-		);
-		// POST
-		this.postRenderPass = new RC.RenderPass(
+		this.gaussPassVert = [];
+		this.gaussPassHor  = [];
+		for (let iPass = 0; iPass < this.dof.numPasses; ++iPass) {
+			this.gaussPassHor.push(new RC.RenderPass(
+				RC.RenderPass.POSTPROCESS,
+				(textureMap, additionalData) => {},
+				(textureMap, additionalData) => {
+					let mat = new RC.CustomShaderMaterial("gaussian_blur", { "horizontal": true });
+					mat.ligths = false;
+					return { 
+						material: mat,
+						textures: [iPass == 0 ? textureMap.downsampled : textureMap.blurred]
+					};
+				},
+				RC.RenderPass.TEXTURE,
+				{ width: this.canvas.width * 0.25, height: this.canvas.height * 0.25 },
+				"dummy4x4",
+				[
+					{ id: "blurred_hor", textureConfig: RGBA16F_LINEAR }
+				]
+			));
+			this.gaussPassVert.push(new RC.RenderPass(
+				RC.RenderPass.POSTPROCESS,
+				(textureMap, additionalData) => {},
+				(textureMap, additionalData) => {
+					let mat = new RC.CustomShaderMaterial("gaussian_blur", { "horizontal": false });
+					mat.ligths = false;
+					return { 
+						material: mat,
+						textures: [textureMap.blurred_hor]
+					};
+				},
+				RC.RenderPass.TEXTURE,
+				{ width: this.canvas.width * 0.25, height: this.canvas.height * 0.25 },
+				"dummy4x4",
+				[
+					{ id: "blurred", textureConfig: RGBA16F_LINEAR }
+				]
+			));
+		}
+		// WATER
+		this.waterRenderPass = new RC.RenderPass(
 			RC.RenderPass.POSTPROCESS,
 			(textureMap, additionalData) => {},
 			(textureMap, additionalData) => {
@@ -405,9 +519,28 @@ class App {
 						textureMap.mainColor,
 						textureMap.mainDepthDist,
 						textureMap.particleColor,
-						textureMap.perlinNoise,
-						textureMap.coc
+						textureMap.perlinNoise
 					]
+				};
+			},
+			RC.RenderPass.TEXTURE,
+			{ width: this.canvas.width, height: this.canvas.height },
+			"dummy",
+			[
+				{ id: "water", textureConfig: RC.RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG }
+			]
+		);
+
+		// POST
+		this.postPass = new RC.RenderPass(
+			RC.RenderPass.POSTPROCESS,
+			(textureMap, additionalData) => {},
+			(textureMap, additionalData) => {
+				let mat = new RC.CustomShaderMaterial("post", {});
+				mat.ligths = false;
+				return { 
+					material: mat,
+					textures: [textureMap.dof, textureMap.particleColor]
 				};
 			},
 			RC.RenderPass.SCREEN,
@@ -420,14 +553,25 @@ class App {
 		this.renderQueue.addTexture("particlesWrite", this.particleTex2);
 
 		this.renderQueue.pushRenderPass(this.perlinNoisePass);
+
 		this.renderQueue.pushRenderPass(this.mainRenderPass);
 		this.renderQueue.pushRenderPass(this.depthPass);
-		this.renderQueue.pushRenderPass(this.cocPass);
-		this.renderQueue.pushRenderPass(this.gaussPassHor);
-		this.renderQueue.pushRenderPass(this.gaussPassVert);
+
 		this.renderQueue.pushRenderPass(this.particleUpdatePass);
 		this.renderQueue.pushRenderPass(this.particleDrawPass);
-		this.renderQueue.pushRenderPass(this.postRenderPass);
+
+		this.renderQueue.pushRenderPass(this.waterRenderPass);
+
+		this.renderQueue.pushRenderPass(this.dofDownsamplePass);
+		for (let i = 0; i < this.dof.numPasses; ++i) {
+			this.renderQueue.pushRenderPass(this.gaussPassHor[i]);
+			this.renderQueue.pushRenderPass(this.gaussPassVert[i]);
+		}
+		this.renderQueue.pushRenderPass(this.cocPass);
+		this.renderQueue.pushRenderPass(this.dofSmallBlurPass);
+		this.renderQueue.pushRenderPass(this.dofPass);
+
+		this.renderQueue.pushRenderPass(this.postPass);
 
 		this.once = 0;
 	}
@@ -542,11 +686,20 @@ class App {
 		this.perlinNoisePass.viewport = { width: this.canvas.width, height: this.canvas.height };
 		this.mainRenderPass.viewport = { width: this.canvas.width, height: this.canvas.height };
 		this.depthPass.viewport = { width: this.canvas.width, height: this.canvas.height };
-		this.cocPass.viewport = { width: this.canvas.width, height: this.canvas.height };
-		this.gaussPassHor.viewport = { width: this.canvas.width, height: this.canvas.height };
-		this.gaussPassVert.viewport = { width: this.canvas.width, height: this.canvas.height };
-		this.postRenderPass.viewport = { width: this.canvas.width, height: this.canvas.height };
+
+		this.dofDownsamplePass.viewport = { width: this.canvas.width * 0.25, height: this.canvas.height * 0.25 };
+		for (let i = 0; i < this.dof.numPasses; ++i) {
+			this.gaussPassHor[i].viewport = { width: this.canvas.width * 0.25, height: this.canvas.height * 0.25 };
+			this.gaussPassVert[i].viewport = { width: this.canvas.width * 0.25, height: this.canvas.height * 0.25 };
+		}
+		this.cocPass.viewport = { width: this.canvas.width * 0.25, height: this.canvas.height * 0.25 };
+		this.dofSmallBlurPass.viewport = { width: this.canvas.width * 0.25, height: this.canvas.height * 0.25 };
+		this.dofPass.viewport = { width: this.canvas.width, height: this.canvas.height };
+
+		this.waterRenderPass.viewport = { width: this.canvas.width, height: this.canvas.height };
 		this.particleDrawPass.viewport = { width: this.canvas.width, height: this.canvas.height };
+
+		this.postPass.viewport = { width: this.canvas.width, height: this.canvas.height };
 	}
 }
 

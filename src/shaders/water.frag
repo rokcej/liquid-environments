@@ -40,7 +40,7 @@ void main() {
 	vec3 mainColor = texture(material.texture0, fragUV).rgb;
 	float mainDepth = texture(material.texture1, fragUV).r;
 	float noise = texture(material.texture3, fragUV).r;
-	//mainColor = applyFog(mainColor, mainDepth, noise);
+	mainColor = applyFog(mainColor, mainDepth, noise);
 
 	vec3 particleColor = texture(material.texture2, fragUV).rgb;
 	//float particleAlpha = texture(material.texture2, fragUV).a;
@@ -50,9 +50,8 @@ void main() {
 	//oColor = vec4(mix(mainColor, particleColor, particleAlpha), 1.0);
 	//oColor = vec4(mainColor + particleColor, 1.0);
 	
-	//oColor = vec4(mainColor, 1.0);
+	oColor = vec4(mainColor, 1.0);
 	//oColor = vec4(particleColor, 1.0);
-	oColor = texture(material.texture4, fragUV);
 
 	// // Gamma correction
 	// float gamma = 2.2;

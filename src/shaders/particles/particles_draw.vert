@@ -31,6 +31,10 @@ out float vProjSize;
 out float vDepthDist;
 
 
+uniform float f; // Focal length
+uniform float a; // Aperture radius
+uniform float v0; // Distance in focus
+
 void main() {
     // Data
     vec4 texel0 = texture(material.texture0, VPos.xy);
@@ -43,15 +47,19 @@ void main() {
     vec4 eyePos = MVMat * vec4(pos, 1.0);
     vPos = eyePos.xyz / eyePos.w;
     gl_Position = PMat * eyePos;
+    vDepthDist = length(vPos);
 
     // Projected point size
     vec4 projSize4 = PMat * vec4(pointSize, 0.0, eyePos.zw);
     vProjSize = projSize4.x / projSize4.w;
-    gl_PointSize = vProjSize;
 
     // Opacity
     float opacity = vProjSize >= 1.0 ? 1.0 : vProjSize * vProjSize;
     
+    // Pseudo-DOF
+    float coc = a * abs(f / (v0 - f)) * abs(v0 / vDepthDist - 1.0);
+    opacity /= 1.0 + coc * 0.5;
+
     vColor = vec4(material.diffuse, opacity * alpha);
-    vDepthDist = length(vPos);
+    gl_PointSize = vProjSize;
 }
