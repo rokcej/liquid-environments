@@ -31,10 +31,6 @@ out float vProjSize;
 out float vDepthDist;
 
 
-uniform float f; // Focal length
-uniform float a; // Aperture radius
-uniform float v0; // Distance in focus
-
 void main() {
     // Data
     vec4 texel0 = texture(material.texture0, VPos.xy);
@@ -55,10 +51,6 @@ void main() {
 
     // Opacity
     float opacity = vProjSize >= 1.0 ? 1.0 : vProjSize * vProjSize;
-    
-    // Pseudo-DOF
-    float coc = a * abs(f / (v0 - f)) * abs(v0 / vDepthDist - 1.0);
-    opacity /= 1.0 + coc * 0.5;
 
     vColor = vec4(material.diffuse, opacity * alpha);
     gl_PointSize = vProjSize;

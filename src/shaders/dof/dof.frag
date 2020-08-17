@@ -54,10 +54,14 @@ vec3 interpolateDof(vec3 source, vec3 small, vec3 med, vec3 large, float coc) {
 void main() {
 	vec3 source = texture(material.texture0, fragUV).rgb;
 	vec3 small  = getSmallBlurSample();
-	vec4 med    = texture(material.texture3, fragUV);
-	vec3 large  = texture(material.texture2, fragUV).rgb;
+	vec4 med    = texture(material.texture4, fragUV);
+	vec3 large  = texture(material.texture3, fragUV).rgb;
 
 	float depth = texture(material.texture1, fragUV).r;
+	
+	float noise = texture(material.texture2, fragUV).r * 0.5 + 0.25;
+	depth *= noise / (1.0 - noise);
+
 	float cocNear = med.a;
 	float cocFar = 0.0;
 	if (depth > v0)

@@ -55,6 +55,9 @@ void main() {
 	}
 	float depth = min(min(minDepth.x, minDepth.y), min(minDepth.z, minDepth.w));
 
+	float noise = texture(material.texture2, fragUV).r * 0.5 + 0.25;
+	depth *= noise / (1.0 - noise);
+
 	// CoC
 	float coc = 0.0;
 	if (depth < v0)

@@ -29,6 +29,10 @@ uniform vec2 uCameraRange; // Camera near & far values
 uniform vec3 uLiquidColor;
 uniform vec3 uLiquidAtten;
 
+uniform float f; // Focal length
+uniform float a; // Aperture radius
+uniform float v0; // Distance in focus
+
 in vec4 vColor;
 in vec3 vPos;
 in float vProjSize;
@@ -97,6 +101,11 @@ void main() {
 
 	// Perlin noise
 	float noise = texture(material.texture2, uv).r;
+	float noise_2 = texture(material.texture3, uv).r * 0.5 + 0.25;
+
+    // Pseudo-DOF
+    float coc = a * abs(f / (v0 - f)) * abs(v0 / (vDepthDist * noise_2 / (1.0 - noise)) - 1.0);
+	opacity /= 1.0 + coc * 0.5;
 	
 	// Color
 	oColor = vec4(applyFog(vColor.rgb * illum, currentDepth, noise), vColor.a * opacity);

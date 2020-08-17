@@ -3,7 +3,7 @@ precision mediump float;
 
 #define M_PI 3.141592653589793238462643
 
-out vec4 oColor;
+out vec4 oColor[2];
 
 uniform vec2  uRes;
 uniform float uTime;
@@ -177,6 +177,8 @@ void main() {
 
 	//float val = perlinNoise2D(xyz.xy, uScale, uOctaves);
 	float val = perlinNoise3D(xyz, uScale, uOctaves);
+	float val2 = perlinNoise3D(xyz + vec3(0.0, 0.0, 6.283), uScale, uOctaves);
 
-	oColor = vec4(vec3(clamp(val, 0.0, 1.0)), 1.0);
+	oColor[0] = vec4(vec3(clamp(val, 0.0, 1.0)), 1.0);
+	oColor[1] = vec4(vec3(clamp(val2, 0.0, 1.0)), 1.0);
 }

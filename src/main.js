@@ -230,18 +230,10 @@ class App {
 			RC.RenderPass.TEXTURE,
 			{ width: this.canvas.width, height: this.canvas.height },
 			"dummy",
-			[{
-				id: "perlinNoise",
-				textureConfig: {
-					wrapS: RC.Texture.ClampToEdgeWrapping,
-					wrapT: RC.Texture.ClampToEdgeWrapping,
-					minFilter: RC.Texture.NearestFilter,
-					magFilter: RC.Texture.NearestFilter,
-					internalFormat: RC.Texture.RGBA32F, // WASTE OF MEMORY!!!
-					format: RC.Texture.RGBA,
-					type: RC.Texture.FLOAT
-				}
-			}]
+			[
+				{ id: "perlinNoise", textureConfig: RGBA16F_LINEAR},
+				{ id: "perlinNoise2", textureConfig: RGBA16F_LINEAR},
+			]
 		);
 		// PARTICLES UPDATE
 		this.particleUpdatePass = new RC.RenderPass(
@@ -279,6 +271,7 @@ class App {
 			(textureMap, additionalData) => {
 				this.particleMesh.material.addMap(textureMap.mainDepthDist);
 				this.particleMesh.material.addMap(textureMap.perlinNoise);
+				this.particleMesh.material.addMap(textureMap.perlinNoise2);
 			},
 			(textureMap, additionalData) => {
 				this.particleMesh.material.setUniform("uRes", [this.canvas.width, this.canvas.height]);
@@ -391,7 +384,7 @@ class App {
 				mat.ligths = false;
 				return { 
 					material: mat,
-					textures: [textureMap.water, textureMap.mainDepthDist]
+					textures: [textureMap.water, textureMap.mainDepthDist, textureMap.perlinNoise2]
 				};
 			},
 			RC.RenderPass.TEXTURE,
@@ -452,7 +445,7 @@ class App {
 				mat.ligths = false;
 				return { 
 					material: mat,
-					textures: [textureMap.water, textureMap.mainDepthDist, textureMap.blurred, textureMap.small_blur]
+					textures: [textureMap.water, textureMap.mainDepthDist, textureMap.perlinNoise2, textureMap.blurred, textureMap.small_blur]
 				};
 			},
 			RC.RenderPass.TEXTURE,
