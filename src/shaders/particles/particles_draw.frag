@@ -64,7 +64,9 @@ vec3 calcLight(Light light) {
 }
 
 void main() {
-	float opacity = 1.0;
+	float opacity = vColor.a;
+	if (opacity == 0.0)
+		discard;
 
 	// Depth test
 	vec2 uv = gl_FragCoord.xy / uRes;
@@ -104,9 +106,9 @@ void main() {
 	float noise_2 = texture(material.texture3, uv).r * 0.5 + 0.25;
 
     // Pseudo-DOF
-    float coc = a * abs(f / (v0 - f)) * abs(v0 / (vDepthDist * noise_2 / (1.0 - noise)) - 1.0);
+    float coc = a * abs(f / (v0 - f)) * abs(v0 / vDepthDist - 1.0);
 	opacity /= 1.0 + coc * 0.5;
 	
 	// Color
-	oColor = vec4(applyFog(vColor.rgb * illum, currentDepth, noise), vColor.a * opacity);
+	oColor = vec4(applyFog(vColor.rgb * illum, currentDepth, noise), opacity);
 }

@@ -34,10 +34,12 @@ out float vDepthDist;
 void main() {
     // Data
     vec4 texel0 = texture(material.texture0, VPos.xy);
-    vec4 texel1 = texture(material.texture0, VPos.xy + vec2(uvOff, 0.0));
+    //vec4 texel1 = texture(material.texture0, VPos.xy + vec2(uvOff, 0.0));
+    vec4 texel2 = texture(material.texture0, VPos.xy + vec2(uvOff * 2.0, 0.0));
 
     vec3 pos = texel0.xyz;
     float life = texel0.w;
+    float age  = texel2.w;
 
     // Projected position
     vec4 eyePos = MVMat * vec4(pos, 1.0);
@@ -51,6 +53,8 @@ void main() {
 
     // Opacity
     float opacity = vProjSize >= 1.0 ? 1.0 : vProjSize * vProjSize;
+    float fadeTime = 1.0;
+    opacity *= min(smoothstep(0.0, fadeTime, age), smoothstep(0.0, fadeTime, life));
 
     vColor = vec4(material.diffuse, opacity * alpha);
     gl_PointSize = vProjSize;

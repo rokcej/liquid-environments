@@ -45,7 +45,7 @@ float rand_constant(vec3 xyz) { // Edited for 3D
 
 // Random unit-length vector
 vec2 getGradient2D(vec2 ixy) {
-	srand(rand_constant(ixy + 1.0)); // +1 to avoid 0
+	srand(rand_constant(ixy + 0.5)); // Add 0.5 to avoid 0
 
 	// // Cartesian coordinates
 	// float x = rand() * 2.0 - 1.0;

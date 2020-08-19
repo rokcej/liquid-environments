@@ -22,10 +22,10 @@ class App {
 		this.mouseInput.setSourceObject(window);
 
 		this.dof = {
-			f: 16.0, // Focal length
-			a: 0.5, // Aperture radius
+			f: 8.0, // Focal length
+			a: 1.0, // Aperture radius
 			v0: 4.0, // Distance in focus
-			numPasses: 2
+			numPasses: 1
 		}
 
 		this.initScene();
@@ -118,8 +118,9 @@ class App {
 		this.scene.add(plane2);
 
 		// Texture based particles
-		let n_comp = 2;
-		let sz = 1024;
+		let n_comp = 3;
+		this.n_comp = n_comp;
+		let sz = 512;
 		let particleData = new Float32Array(sz * sz * n_comp * 4);
 
 		for (let y = 0; y < sz; ++y) {
@@ -167,7 +168,7 @@ class App {
 		mat.depthWrite = true;
 		mat.depthTest = false;
 		mat.usePoints = true;
-		mat.pointSize = 6.0;
+		mat.pointSize = 12.0;
 		mat.lights = true;
 		mat.addMap(this.particleTex2);
 
@@ -243,8 +244,10 @@ class App {
 				let mat = new RC.CustomShaderMaterial("particles_update", {
 					"uRes": [this.particleTex.width, this.particleTex.height],
 					"uDT": this.timer.delta,
+					"uTime": this.timer.curr,
 					"uSeed": Math.random(),
-					"uCameraPos": this.camera.position.toArray()
+					"uCameraPos": this.camera.position.toArray(),
+					"uNumComp": this.n_comp
 				});
 				mat.ligths = false;
 				return { material: mat, textures: [textureMap.particlesRead] };
