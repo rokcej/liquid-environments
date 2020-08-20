@@ -25,7 +25,9 @@ class App {
 			f: 8.0, // Focal length
 			a: 1.0, // Aperture radius
 			v0: 4.0, // Distance in focus
-			numPasses: 1
+			v0_target: 4.0,
+			numPasses: 1,
+			lastUpdate: 0.0
 		}
 
 		this.initScene();
@@ -108,13 +110,14 @@ class App {
 		plane.translateY(-4);
 		plane.rotateX(Math.PI * 0.5);
 
-		plane.material.addMap(texture);
+		//plane.material.addMap(texture);
 		this.scene.add(plane);
 
 		let plane2 = new RC.Quad({x: -64, y: 64}, {x: 64, y: -64}, this.createPhongMat());
 		plane2.material.side = RC.FRONT_AND_BACK_SIDE;
-		plane2.material.addMap(texture);
+		//plane2.material.addMap(texture);
 		plane2.translateZ(-35);
+		
 		this.scene.add(plane2);
 
 		// Texture based particles
@@ -196,6 +199,25 @@ class App {
 
 		this.q1 = q1;
 		this.q2 = q2;
+
+
+
+
+		// Shadow map
+		this.shadowMap = {
+			size: 1024,
+			camera: new RC.PerspectiveCamera(90, 1.0, 0.1, 1000.0),
+			//lightSpaceMat: new RC.Matrix4(),
+		};
+		this.shadowMap.texture = new RC.Texture(
+			null, RC.Texture.RepeatWrapping, RC.Texture.RepeatWrapping,	RC.Texture.NearestFilter, RC.Texture.NearestFilter,
+			RC.Texture.DEPTH_COMPONENT24, RC.Texture.DEPTH_COMPONENT, RC.Texture.UNSIGNED_INT, this.shadowMap.size, this.shadowMap.size
+		);
+		this.shadowMap.camera.position = new RC.Vector3(-4.0, 10.0, -20.0);
+		this.shadowMap.camera.lookAt(new RC.Vector3(0.0, 0.0, 0.0), new RC.Vector3(0.0, 1.0, 0.0));
+		this.shadowMap.camera.updateMatrixWorld();
+		this.shadowMap.camera.matrixWorldInverse.getInverse(this.shadowMap.camera.matrixWorld);
+		//this.shadowMap.lightSpaceMat.multiplyMatrices(this.shadowMap.camera.projectionMatrix, this.shadowMap.camera.matrixWorldInverse);
 	}
 
 	initRenderQueue() {
@@ -299,11 +321,54 @@ class App {
 				textureConfig: RC.RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG
 			}]
 		);
-		// MAIN
-		this.mainRenderPass = new RC.RenderPass(
+		// SHADOW MAP
+		this.shadowPass = new RC.RenderPass(
 			RC.RenderPass.BASIC,
 			(textureMap, additionalData) => {},
 			(textureMap, additionalData) => {
+				// this.scene.traverse((object) => {
+				// 	if (object instanceof RC.Mesh && object.material instanceof RC.CustomShaderMaterial) {
+				// 	}
+				// });
+				for (let object of this.sceneObjects) {;
+					object.material = object.material_temp;
+					object.material.setUniform("uLightPos", this.shadowMap.camera.position.toArray());
+					object.material.setUniform("uFarPlane", this.shadowMap.camera.far);
+				}
+				
+				return { scene: this.scene, camera: this.shadowMap.camera };
+			},
+			RC.RenderPass.TEXTURE,
+			{ width: this.shadowMap.size, height: this.shadowMap.size },
+			"shadowDepthBuf",
+			[
+				//{ id: "shadowColor", textureConfig: RC.RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG }
+			]
+		);
+		// MAIN
+		this.mainRenderPass = new RC.RenderPass(
+			RC.RenderPass.BASIC,
+			(textureMap, additionalData) => {
+				// this.scene.traverse((object) => {
+				// 	if (object instanceof RC.Mesh && object.material instanceof RC.CustomShaderMaterial) {
+				// 		object.material.addMap(textureMap.shadowDepthBuf);
+				// 	}
+				// });
+				// for (let object of this.sceneObjects) {
+				// 	object.material_main.addMap(textureMap.shadowDepthBuf);
+				// }
+			},
+			(textureMap, additionalData) => {
+				for (let object of this.sceneObjects) {
+					object.material = object.material_main;
+					
+					object.material.setUniform("uMMat", object.matrix.toArray());
+					//object.material.setUniform("uLSMat", this.shadowMap.lightSpaceMat.toArray());
+					object.material.setUniform("uLPMat", this.shadowMap.camera.projectionMatrix.toArray());
+					object.material.setUniform("uLVMat", this.shadowMap.camera.matrixWorldInverse.toArray());
+					object.material.setUniform("uFarPlane", this.shadowMap.camera.far);
+				}
+
 				// for (let l of this.lights)
 				// 	this.scene.add(l);
 
@@ -347,37 +412,6 @@ class App {
 			RC.RenderPass.POSTPROCESS,
 			(textureMap, additionalData) => {},
 			(textureMap, additionalData) => {
-				// TODO: Cleanup / optimize
-				// Get the depth camera is looking at
-				if (this.fboDepth === undefined) {
-					this.fboDepth = this.gl.createFramebuffer();
-					this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.fboDepth);
-					
-					let texture = this.renderer._glManager._textureManager._cached_textures.get(textureMap.mainDepthDist);
-					this.gl.framebufferTexture2D(
-						this.gl.FRAMEBUFFER, this.gl.COLOR_ATTACHMENT0,
-						this.gl.TEXTURE_2D, texture, 0
-					);
-					// Check if you can read from this type of texture.
-					let canRead = (this.gl.checkFramebufferStatus(this.gl.FRAMEBUFFER) == this.gl.FRAMEBUFFER_COMPLETE);
-					if (!canRead)
-						throw "Unable to read depth framebuffer!";
-				} else {
-					this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.fboDepth);
-				}
-
-				let pixel = new Float32Array(4);
-				this.gl.readPixels(Math.trunc(this.canvas.width / 2), Math.trunc(this.canvas.height / 2), 1, 1, this.gl.RGBA, this.gl.FLOAT, pixel);
-				// Unbind the framebuffer
-				this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
-
-				let depth = pixel[0];
-				let diff = this.dof.v0 - depth;
-				if (Math.abs(diff) > 0.00001);
-					this.dof.v0 -= diff * this.timer.delta * 2.0;
-
-
-
 				let mat = new RC.CustomShaderMaterial("dof_downsample_near", {
 					"uSrcResInv": [1.0 / this.canvas.width, 1.0 / this.canvas.height],
 					"f": this.dof.f,
@@ -536,7 +570,7 @@ class App {
 				mat.ligths = false;
 				return { 
 					material: mat,
-					textures: [textureMap.dof, textureMap.particleColor]
+					textures: [textureMap.mainColor]//, textureMap.particleColor]
 				};
 			},
 			RC.RenderPass.SCREEN,
@@ -547,25 +581,28 @@ class App {
 
 		this.renderQueue.addTexture("particlesRead", this.particleTex);
 		this.renderQueue.addTexture("particlesWrite", this.particleTex2);
+		this.renderQueue.addTexture("shadowDepthBuf", this.shadowMap.texture);
 
-		this.renderQueue.pushRenderPass(this.perlinNoisePass);
+		// this.renderQueue.pushRenderPass(this.perlinNoisePass);
+
+		this.renderQueue.pushRenderPass(this.shadowPass);
 
 		this.renderQueue.pushRenderPass(this.mainRenderPass);
 		this.renderQueue.pushRenderPass(this.depthPass);
 
-		this.renderQueue.pushRenderPass(this.particleUpdatePass);
-		this.renderQueue.pushRenderPass(this.particleDrawPass);
+		// this.renderQueue.pushRenderPass(this.particleUpdatePass);
+		// this.renderQueue.pushRenderPass(this.particleDrawPass);
 
-		this.renderQueue.pushRenderPass(this.waterRenderPass);
+		// this.renderQueue.pushRenderPass(this.waterRenderPass);
 
-		this.renderQueue.pushRenderPass(this.dofDownsamplePass);
-		for (let i = 0; i < this.dof.numPasses; ++i) {
-			this.renderQueue.pushRenderPass(this.gaussPassHor[i]);
-			this.renderQueue.pushRenderPass(this.gaussPassVert[i]);
-		}
-		this.renderQueue.pushRenderPass(this.cocPass);
-		this.renderQueue.pushRenderPass(this.dofSmallBlurPass);
-		this.renderQueue.pushRenderPass(this.dofPass);
+		// this.renderQueue.pushRenderPass(this.dofDownsamplePass);
+		// for (let i = 0; i < this.dof.numPasses; ++i) {
+		// 	this.renderQueue.pushRenderPass(this.gaussPassHor[i]);
+		// 	this.renderQueue.pushRenderPass(this.gaussPassVert[i]);
+		// }
+		// this.renderQueue.pushRenderPass(this.cocPass);
+		// this.renderQueue.pushRenderPass(this.dofSmallBlurPass);
+		// this.renderQueue.pushRenderPass(this.dofPass);
 
 		this.renderQueue.pushRenderPass(this.postPass);
 
@@ -610,6 +647,27 @@ class App {
 				}
 			}
 
+			// TODO
+			this.sceneObjects = []
+			this.scene.traverse((object) => {
+				if (object instanceof RC.Mesh && object.material instanceof RC.CustomShaderMaterial) {
+					object.material.addMap(this.shadowMap.texture);
+					//let mat = new RC.MeshBasicMaterial();
+					let mat = new RC.CustomShaderMaterial("shadow_map");
+					//mat.lights = false;
+					mat.side = object.material.side;
+					// // To prevent Peter Panning
+					// switch (object.material.side) {
+					// 	case RC.FRONT_SIDE: mat.side = RC.BACK_SIDE; break;
+					// 	case RC.BACK_SIDE: mat.side = RC.FRONT_SIDE; break;
+					// 	default: mat.side = object.material.side; break;
+					// }
+					object.material_temp = mat;
+					object.material_main = object.material;
+					this.sceneObjects.push(object);
+				}
+			});
+
 			callback();
 		});
 	}
@@ -629,6 +687,41 @@ class App {
 			this.fpsCount = 0;
 			this.fpsTime = this.timer.curr;
 		}
+
+		// DOF
+		if (this.timer.curr - this.dof.lastUpdate >= 0.5) {
+			if (this.renderQueue._textureMap.mainDepthDist !== undefined) {
+				// Get the depth camera is looking at
+				if (this.fboDepth === undefined) {
+					this.fboDepth = this.gl.createFramebuffer();
+					this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.fboDepth);
+					
+					let texture = this.renderer._glManager._textureManager._cached_textures.get(this.renderQueue._textureMap.mainDepthDist);
+					this.gl.framebufferTexture2D(
+						this.gl.FRAMEBUFFER, this.gl.COLOR_ATTACHMENT0,
+						this.gl.TEXTURE_2D, texture, 0
+					);
+					// Check if you can read from this type of texture.
+					let canRead = (this.gl.checkFramebufferStatus(this.gl.FRAMEBUFFER) == this.gl.FRAMEBUFFER_COMPLETE);
+					if (!canRead)
+						throw "Unable to read depth framebuffer!";
+				} else {
+					this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.fboDepth);
+				}
+
+				let pixel = new Float32Array(4);
+				this.gl.readPixels(Math.trunc(this.canvas.width / 2), Math.trunc(this.canvas.height / 2), 1, 1, this.gl.RGBA, this.gl.FLOAT, pixel);
+				// Unbind the framebuffer
+				this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+
+				this.dof.v0_target = pixel[0];
+				this.dof.lastUpdate = this.timer.curr;
+			}
+		}
+		let diff = this.dof.v0 - this.dof.v0_target;
+		if (Math.abs(diff) > 0.00001);
+			this.dof.v0 -= diff * this.timer.delta * 2.0;
+
 
 		// Camera
 		const input = {

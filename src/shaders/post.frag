@@ -18,15 +18,15 @@ out vec4 oColor;
 
 void main() {
 	vec3 tex0 = texture(material.texture0, fragUV).rgb;
-	float coc = texture(material.texture0, fragUV).a;
-	vec3 tex1 = texture(material.texture1, fragUV).rgb;
+	// float coc = texture(material.texture0, fragUV).a;
+	// vec3 tex1 = texture(material.texture1, fragUV).rgb;
 
 
-	vec3 off = vec3(0.005, 0.0, -0.005) * coc;
-	float r = texture(material.texture0, (fragUV - 0.5) * (1.0 + off.r) + 0.5).r;
-	float g = texture(material.texture0, (fragUV - 0.5) * (1.0 + off.g) + 0.5).g;
-	float b = texture(material.texture0, (fragUV - 0.5) * (1.0 + off.b) + 0.5).b;
+	// vec3 off = vec3(0.005, 0.0, -0.005) * coc;
+	// float r = texture(material.texture0, (fragUV - 0.5) * (1.0 + off.r) + 0.5).r;
+	// float g = texture(material.texture0, (fragUV - 0.5) * (1.0 + off.g) + 0.5).g;
+	// float b = texture(material.texture0, (fragUV - 0.5) * (1.0 + off.b) + 0.5).b;
 
-	oColor = vec4(vec3(r, g, b), 1.0);
-	oColor = vec4(tex0 + tex1, 1.0);
+	// oColor = vec4(vec3(r, g, b) + tex1, 1.0);
+	oColor = vec4(tex0, 1.0);
 }

@@ -56,6 +56,11 @@ in vec3 fragVPos;
 	in vec3 vViewPosition;
 #fi
 
+uniform float uFarPlane;
+
+in vec4 fragVPos4LS;
+in float fragVDepth;
+
 out vec4 oColor[3];
 
 // Calculates the point light color contribution
@@ -125,26 +130,53 @@ void main() {
 	// Calculate combined light contribution
 	vec3 combined = ambient;
 
+	float shadow = 0.0;
+	#if (TEXTURE)
+	vec3 posLS = (fragVPos4LS.xyz / fragVPos4LS.w) * 0.5 + 0.5;
+	if (posLS.x > 0.0 && posLS.x < 1.0 && posLS.y > 0.0 && posLS.y < 1.0 && posLS.z < 1.0) {
+		//float lightClosestDepth = texture(material.texture0, posLS.xy).r;
+		//float lightCurrentDepth = posLS.z;
+		float lightCurrentDepth = fragVDepth;
+
+		// TODO fix bias
+		//float bias = 0.05;
+		vec3 lightDir = normalize(lights[0].position - fragVPos);
+		float bias = max(0.1 * (1.0 - dot(normal, lightDir)), 0.05);
+		//shadow = lightCurrentDepth - bias > lightClosestDepth ? 1.0 : 0.0;
+
+
+		vec2 texelSize = 1.0 / vec2(textureSize(material.texture0, 0));
+		for (int x = -1; x <= 1; ++x) {
+			for (int y = -1; y <= 1; ++y) {
+				float pcfDepth = texture(material.texture0, posLS.xy + vec2(x, y) * texelSize).r * uFarPlane; 
+				shadow += lightCurrentDepth - bias > pcfDepth ? 1.0 : 0.0;        
+			}    
+		}
+		shadow /= 9.0;
+
+	}
+	
+	#fi
+
 	#if (!NO_LIGHTS)
 		#for lightIdx in 0 to NUM_LIGHTS
 			if (!lights[##lightIdx].directional) {
-				combined += calcPointLight(lights[##lightIdx], normal, viewDir);
+				combined += (1.0 - shadow) * calcPointLight(lights[##lightIdx], normal, viewDir);
 			}
 			else {
-				combined += calcDirectLight(lights[##lightIdx], normal, viewDir);
+				combined += (1.0 - shadow) * calcDirectLight(lights[##lightIdx], normal, viewDir);
 			}
 		#end
 	#fi
 
 	oColor[0] = vec4(combined, alpha);
 
-	#if (TEXTURE)
-		// Apply all of the textures
-		#for I_TEX in 0 to NUM_TEX
-			oColor[0] *= texture(material.texture##I_TEX, fragUV);
-		#end
-
-	#fi
+	// #if (TEXTURE)
+	// 	// Apply all of the textures
+	// 	#for I_TEX in 0 to NUM_TEX
+	// 		oColor[0] *= texture(material.texture##I_TEX, fragUV);
+	// 	#end
+	// #fi
 
 	#if (COLORS)
 		oColor[0] *= vec4(fragVColor.rgb, alpha);

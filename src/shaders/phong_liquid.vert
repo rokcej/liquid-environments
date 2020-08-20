@@ -42,23 +42,36 @@ out vec2 fragUV;
 	out vec3 vViewPosition;
 #fi
 
+
+
+out vec4 fragVPos4LS;
+out float fragVDepth;
+
+uniform mat4 uMMat;
+//uniform mat4 uLSMat;
+uniform mat4 uLPMat;
+uniform mat4 uLVMat;
+
 void main() {
 	// Model view position
-	//vec4 VPos4 = MVMat * vec4(VPos, 1.0); //original (non-instanced)
 	#if (!INSTANCED)
 	vec4 VPos4 = MVMat * vec4(VPos, 1.0);
+	vec4 VPos4LV = uLVMat * uMMat * vec4(VPos, 1.0);
+	vec4 VPos4LPV = uLPMat * VPos4LV;
 	#fi
 	#if (INSTANCED)
-	//vec4 VPos4 = VMat * MMat * vec4(VPos, 1.0);
 	vec4 VPos4 = MVMat * MMat * vec4(VPos, 1.0);
+	vec4 VPos4LV = uLVMat * uMMat * MMat * vec4(VPos, 1.0);
+	vec4 VPos4LPV = uLPMat * VPos4LV;
 	#fi
 
 	// Projected position
 	gl_Position = PMat * VPos4;
 	fragVPos = vec3(VPos4) / VPos4.w;
+	fragVPos4LS = VPos4LPV;
+	fragVDepth = length(VPos4LV.xyz / VPos4LV.w);
 
 	// Transform normal
-	//fragVNorm = vec3(NMat * VNorm);
 	#if (!INSTANCED)
 	fragVNorm = vec3(NMat * VNorm);
 	#fi

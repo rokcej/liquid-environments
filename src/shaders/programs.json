@@ -82,5 +82,12 @@
 			"vertex": "texture.vert",
 			"fragment": "gaussian_blur.frag"
 		}
+	},
+	"custom_shadow_map": {
+		"description": "Shadow map.",
+		"shaders": {
+			"vertex": "lights/shadow_map.vert",
+			"fragment": "lights/shadow_map.frag"
+		}
 	}
 }
