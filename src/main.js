@@ -2,14 +2,10 @@ import * as RC from "/rendercore/src/RenderCore.js";
 
 class App {
 	constructor(canvas) {
+		window.app = this;
 		// Canvas
 		this.canvas = canvas;
-		// Animation timer
-		this.timer = { curr: 0, prev: 0, delta: 0 };
-		// FPS
-		this.fpsCount = 0;
-		this.fpsTime = 0;
-		
+		// Renderer
 		this.renderer = new RC.MeshRenderer(this.canvas, RC.WEBGL2);
 		this.renderer.clearColor = "#000000FF";
 		this.renderer.addShaderLoaderUrls("/rendercore/src/shaders");
@@ -21,15 +17,7 @@ class App {
 		this.mouseInput = RC.MouseInput.instance;
 		this.mouseInput.setSourceObject(window);
 
-		this.dof = {
-			f: 8.0, // Focal length
-			a: 1.0, // Aperture radius
-			v0: 4.0, // Distance in focus
-			v0_target: 4.0,
-			numPasses: 1,
-			lastUpdate: 0.0
-		}
-
+		this.initSettings();
 		this.initScene();
 		this.initRenderQueue();
 		this.resize();
@@ -40,6 +28,37 @@ class App {
 			() => { window.requestAnimationFrame(() => { this.update(); }); }
 		);
 		//window.requestAnimationFrame(() => { this.update(); });
+	}
+
+	initSettings() {
+		// Animation timer
+		this.timer = { curr: 0, prev: 0, delta: 0 };
+		// FPS
+		this.fpsCount = 0;
+		this.fpsTime = 0;
+		// DOF
+		this.dof = {
+			f: 8.0, // Focal length
+			a: 1.0, // Aperture radius
+			v0: 4.0, // Distance in focus
+			v0_target: 4.0,
+			numPasses: 1,
+			lastUpdate: 0.0,
+			focus: {x: 640, y: 360},
+			mousedown: {x: -1, y: -1}
+		}		
+		document.addEventListener("mousedown", (event) => {
+			this.dof.mousedown.x = event.clientX;
+			this.dof.mousedown.y = event.clientY;
+		});
+		document.addEventListener("mouseup", (event) => {
+			let x = event.clientX, y = event.clientY;
+			if (x === this.dof.mousedown.x && y === this.dof.mousedown.y &&
+				x >= 0 && x < this.canvas.width && y >= 0 && y < this.canvas.height) {
+				this.dof.focus.x = x;
+				this.dof.focus.y = this.canvas.height - 1 - y;
+			}
+		});
 	}
 
 	createPhongMat(color, specular, shininess) {
@@ -206,7 +225,7 @@ class App {
 		// Shadow map
 		this.shadowMap = {
 			size: 1024,
-			camera: new RC.PerspectiveCamera(90, 1.0, 0.1, 1000.0),
+			camera: new RC.PerspectiveCamera(90, 1.0, 0.1, 500.0),
 			//lightSpaceMat: new RC.Matrix4(),
 			scene: new RC.Scene(),
 			// texture: new RC.Texture(),
@@ -645,7 +664,8 @@ class App {
 						textureMap.mainColor,
 						textureMap.mainDepthDist,
 						textureMap.particleColor,
-						textureMap.perlinNoise
+						textureMap.perlinNoise,
+						textureMap.lightVolume
 					]
 				};
 			},
@@ -666,7 +686,7 @@ class App {
 				mat.ligths = false;
 				return { 
 					material: mat,
-					textures: [textureMap.mainColor, textureMap.lightVolume]//, textureMap.particleColor]
+					textures: [textureMap.dof, textureMap.particleColor]
 				};
 			},
 			RC.RenderPass.SCREEN,
@@ -679,7 +699,7 @@ class App {
 		this.renderQueue.addTexture("particlesWrite", this.particleTex2);
 		this.renderQueue.addTexture("shadowDepthBuf", this.shadowMap.texture);
 
-		// this.renderQueue.pushRenderPass(this.perlinNoisePass);
+		this.renderQueue.pushRenderPass(this.perlinNoisePass);
 
 		this.renderQueue.pushRenderPass(this.shadowPass);
 
@@ -688,19 +708,19 @@ class App {
 
 		this.renderQueue.pushRenderPass(this.lightVolumePass);
 
-		// this.renderQueue.pushRenderPass(this.particleUpdatePass);
-		// this.renderQueue.pushRenderPass(this.particleDrawPass);
+		this.renderQueue.pushRenderPass(this.particleUpdatePass);
+		this.renderQueue.pushRenderPass(this.particleDrawPass);
 
-		// this.renderQueue.pushRenderPass(this.waterRenderPass);
+		this.renderQueue.pushRenderPass(this.waterRenderPass);
 
-		// this.renderQueue.pushRenderPass(this.dofDownsamplePass);
-		// for (let i = 0; i < this.dof.numPasses; ++i) {
-		// 	this.renderQueue.pushRenderPass(this.gaussPassHor[i]);
-		// 	this.renderQueue.pushRenderPass(this.gaussPassVert[i]);
-		// }
-		// this.renderQueue.pushRenderPass(this.cocPass);
-		// this.renderQueue.pushRenderPass(this.dofSmallBlurPass);
-		// this.renderQueue.pushRenderPass(this.dofPass);
+		this.renderQueue.pushRenderPass(this.dofDownsamplePass);
+		for (let i = 0; i < this.dof.numPasses; ++i) {
+			this.renderQueue.pushRenderPass(this.gaussPassHor[i]);
+			this.renderQueue.pushRenderPass(this.gaussPassVert[i]);
+		}
+		this.renderQueue.pushRenderPass(this.cocPass);
+		this.renderQueue.pushRenderPass(this.dofSmallBlurPass);
+		this.renderQueue.pushRenderPass(this.dofPass);
 
 		this.renderQueue.pushRenderPass(this.postPass);
 
@@ -809,7 +829,7 @@ class App {
 				}
 
 				let pixel = new Float32Array(4);
-				this.gl.readPixels(Math.trunc(this.canvas.width / 2), Math.trunc(this.canvas.height / 2), 1, 1, this.gl.RGBA, this.gl.FLOAT, pixel);
+				this.gl.readPixels(this.dof.focus.x, this.dof.focus.y, 1, 1, this.gl.RGBA, this.gl.FLOAT, pixel);
 				// Unbind the framebuffer
 				this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
 
@@ -892,8 +912,13 @@ class App {
 		this.particleDrawPass.viewport = { width: this.canvas.width, height: this.canvas.height };
 
 		this.postPass.viewport = { width: this.canvas.width, height: this.canvas.height };
+		
+		// DOF focus
+		this.dof.focus.x = Math.trunc(this.canvas.width / 2.0);
+		this.dof.focus.y = Math.trunc(this.canvas.height / 2.0);
 	}
 }
+
 
 document.addEventListener("DOMContentLoaded", () => {
 	const canvas = document.getElementById("canvas");

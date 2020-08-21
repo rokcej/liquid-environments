@@ -41,7 +41,7 @@ vec3 interpolateDof(vec3 source, vec3 small, vec3 med, vec3 large, float coc) {
 	// d0, the small to medium blur over distance d1, and the medium to
 	// large blur over distance d2, where d0 + d1 + d2 = 1.
 
-	float d0 = 0.33, d1 = 0.33, d2 = 0.33;
+	float d0 = 0.25, d1 = 0.25, d2 = 0.5;
 
 	// // Black magic
 	// vec4 dofLerpScale = vec4(-1.0 / d0, -1.0 / d1, -1.0 / d2, 1.0 / d2);

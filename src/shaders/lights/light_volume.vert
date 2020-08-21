@@ -29,20 +29,23 @@ uniform float uFarPlane;
 
 // Output transformed vertex position
 out vec3 vEyePos;
+out float vLightDist;
 
 
 void main() {
 	vec3 pos;
+	float lightDist;
 	if (VPos.z == 0.0) {
 		vec2 uv = VPos.xy;
 		vec4 pos4 = uVPMatInv * vec4(uv * 2.0 - 1.0, 0.0, 1.0);
 
-		float dist = texture(material.texture0, uv).r * uFarPlane; // - 0.001;
+		lightDist = texture(material.texture0, uv).r * uFarPlane; // - 0.001;
 		vec3 dir = normalize(pos4.xyz / pos4.w - uLightPos);
 
-		pos = uLightPos + dir * dist;
+		pos = uLightPos + dir * lightDist;
 	} else {
 		pos = uLightPos;
+		lightDist = 0.0;
 	}
 
 	pos += normalize(uCameraPos - pos) * 0.1;
@@ -50,4 +53,5 @@ void main() {
 	vec4 eyePos4 = MVMat * vec4(pos, 1.0);
 	gl_Position = PMat * eyePos4;
 	vEyePos = eyePos4.xyz / eyePos4.w;
+	vLightDist = lightDist;
 }

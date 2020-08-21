@@ -26,6 +26,7 @@ uniform Material material;
 uniform vec2 uResInv;
 
 in vec3 vEyePos;
+in float vLightDist;
 
 out vec4 oColor;
 
@@ -40,10 +41,10 @@ void main() {
 	// 	discard;
 	float depth = min(currentDepth, closestDepth);
 
-	vec3 color = vec3(1.0, 0.98, 0.9);
-	float alpha = (1.0 - exp(-0.01 * depth));
-	//float alpha = exp(-25.0 / depth);
-	//float alpha = depth / 100.0;
+	vec3 color = vec3(0.7, 0.84, 1.0);
+	float alpha = (1.0 - exp(-0.01 * depth));// * exp(-0.1 * vLightDist);
+	//float alpha = exp(-vLightDist / depth);
+	//float alpha = depth / 100.0 * exp(-0.1 * vLightDist);
 
 	if (gl_FrontFacing) {
 		//color *= -1.0;
