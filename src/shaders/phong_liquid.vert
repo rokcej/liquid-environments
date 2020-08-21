@@ -45,7 +45,7 @@ out vec2 fragUV;
 
 
 out vec4 fragVPos4LS;
-out float fragVDepth;
+out vec4 fragVPos4LV;
 
 uniform mat4 uMMat;
 //uniform mat4 uLSMat;
@@ -69,7 +69,7 @@ void main() {
 	gl_Position = PMat * VPos4;
 	fragVPos = vec3(VPos4) / VPos4.w;
 	fragVPos4LS = VPos4LPV;
-	fragVDepth = length(VPos4LV.xyz / VPos4LV.w);
+	fragVPos4LV = VPos4LV;
 
 	// Transform normal
 	#if (!INSTANCED)

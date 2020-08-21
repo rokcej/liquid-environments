@@ -15,8 +15,8 @@ out vec4 oColor;
 #fi
 
 
-in float vFragDepth;
-uniform vec3 uLightPos;
+in vec3 vFragPos;
+uniform float uFarPlane;
 
 void main() {
     #if (CLIPPING_PLANES)
@@ -27,5 +27,5 @@ void main() {
         if ( clipped ) discard;
     #fi
 
-	gl_FragDepth = vFragDepth;
+	gl_FragDepth = length(vFragPos) / uFarPlane;
 }

@@ -90,4 +90,12 @@
 			"fragment": "lights/shadow_map.frag"
 		}
 	}
+	,
+	"custom_light_volume": {
+		"description": "Polygonal light volume.",
+		"shaders": {
+			"vertex": "lights/light_volume.vert",
+			"fragment": "lights/light_volume.frag"
+		}
+	}
 }

@@ -208,6 +208,8 @@ class App {
 			size: 1024,
 			camera: new RC.PerspectiveCamera(90, 1.0, 0.1, 1000.0),
 			//lightSpaceMat: new RC.Matrix4(),
+			scene: new RC.Scene(),
+			// texture: new RC.Texture(),
 		};
 		this.shadowMap.texture = new RC.Texture(
 			null, RC.Texture.RepeatWrapping, RC.Texture.RepeatWrapping,	RC.Texture.NearestFilter, RC.Texture.NearestFilter,
@@ -218,6 +220,73 @@ class App {
 		this.shadowMap.camera.updateMatrixWorld();
 		this.shadowMap.camera.matrixWorldInverse.getInverse(this.shadowMap.camera.matrixWorld);
 		//this.shadowMap.lightSpaceMat.multiplyMatrices(this.shadowMap.camera.projectionMatrix, this.shadowMap.camera.matrixWorldInverse);
+		
+		this.shadowMap.PMatInv = new RC.Matrix4().getInverse(this.shadowMap.camera.projectionMatrix);
+
+		sz = this.shadowMap.size;
+		let vbo = new Float32Array((sz * sz + 1) * 3);
+		for (let y = 0; y < sz; ++y) {
+			for (let x = 0; x < sz; ++x) {
+				let i = x + sz * y;
+				vbo[3 * i + 0] = (x + 0.5) / sz;
+				vbo[3 * i + 1] = 1.0 - (y + 0.5) / sz;
+				vbo[3 * i + 2] = 0.0;
+			}
+		}
+		vbo[sz * sz * 3 + 0] = 0.0;
+		vbo[sz * sz * 3 + 1] = 0.0;
+		vbo[sz * sz * 3 + 2] = 1.0;
+
+		let ibo = new Uint32Array(((sz-1) * (sz-1) * 2 + 4 * (sz-1)) * 3);
+		for (let y = 0; y < sz-1; ++y) {
+			for (let x = 0; x < sz-1; ++x) {
+				let i = x + (sz-1) * y;
+				let j0 = x + sz * y;
+				let j1 = x + sz * (y+1);
+
+				ibo[6 * i + 0] = j0;
+				ibo[6 * i + 1] = j0+1;
+				ibo[6 * i + 2] = j1;
+
+				ibo[6 * i + 3] = j1;
+				ibo[6 * i + 4] = j0+1;
+				ibo[6 * i + 5] = j1+1;
+			}
+		}
+		let iLast = sz * sz;
+		let ioff = 6 * (sz-1) * (sz-1);
+
+		let offset = [0, sz * sz - 1, sz - 1, sz * (sz-1)]; // top left, bot right, top right, bot left
+		let increment = [1, -1, sz, -sz];
+		for (let j = 0; j < sz-1; ++j) {
+			for (let k = 0; k < 4; ++k) {
+				ibo[ioff++] = iLast;
+				ibo[ioff++] = offset[k] + increment[k];
+				ibo[ioff++] = offset[k];
+				offset[k] += increment[k];
+			}
+		}
+		if (ioff !== ((sz-1) * (sz-1) * 2 + 4 * (sz-1)) * 3)
+			throw "Incorrect number of indices!";
+
+		geo = new RC.Geometry();
+		geo.vertices = new RC.BufferAttribute(vbo, 3);
+		geo.indices  = new RC.BufferAttribute(ibo, 1);
+		//geo.drawWireframe = true;
+
+		mat = new RC.CustomShaderMaterial("light_volume", {});
+		mat.color = new RC.Color(1, 1, 1);
+		mat.depthWrite = true;
+		mat.depthTest = false;
+		mat.lights = false;
+		mat.transparent = true;
+		mat.side = RC.FRONT_AND_BACK_SIDE;
+		mat.addMap(this.shadowMap.texture);
+		
+
+		this.shadowMap.mesh = new RC.Mesh(geo, mat);
+		this.shadowMap.mesh.frustumCulled = false;
+		this.shadowMap.scene.add(this.shadowMap.mesh);
 	}
 
 	initRenderQueue() {
@@ -330,7 +399,7 @@ class App {
 				// 	if (object instanceof RC.Mesh && object.material instanceof RC.CustomShaderMaterial) {
 				// 	}
 				// });
-				for (let object of this.sceneObjects) {;
+				for (let object of this.sceneObjects) {
 					object.material = object.material_temp;
 					object.material.setUniform("uLightPos", this.shadowMap.camera.position.toArray());
 					object.material.setUniform("uFarPlane", this.shadowMap.camera.far);
@@ -362,11 +431,13 @@ class App {
 				for (let object of this.sceneObjects) {
 					object.material = object.material_main;
 					
-					object.material.setUniform("uMMat", object.matrix.toArray());
-					//object.material.setUniform("uLSMat", this.shadowMap.lightSpaceMat.toArray());
-					object.material.setUniform("uLPMat", this.shadowMap.camera.projectionMatrix.toArray());
-					object.material.setUniform("uLVMat", this.shadowMap.camera.matrixWorldInverse.toArray());
-					object.material.setUniform("uFarPlane", this.shadowMap.camera.far);
+					if (object.material instanceof RC.CustomShaderMaterial) {
+						object.material.setUniform("uMMat", object.matrix.toArray());
+						//object.material.setUniform("uLSMat", this.shadowMap.lightSpaceMat.toArray());
+						object.material.setUniform("uLPMat", this.shadowMap.camera.projectionMatrix.toArray());
+						object.material.setUniform("uLVMat", this.shadowMap.camera.matrixWorldInverse.toArray());
+						object.material.setUniform("uFarPlane", this.shadowMap.camera.far);
+					}
 				}
 
 				// for (let l of this.lights)
@@ -379,6 +450,31 @@ class App {
 			"mainDepthBuf",
 			[
 				{ id: "mainColor", textureConfig: RC.RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG }
+			]
+		);
+		// LIGHT VOLUME
+		this.lightVolumePass = new RC.RenderPass(
+			RC.RenderPass.BASIC,
+			(textureMap, additionalData) => {
+				//this.shadowMap.mesh.material.addMap(textureMap.mainDepthBuf);
+				this.shadowMap.mesh.material.addMap(textureMap.mainDepthDist);
+			},
+			(textureMap, additionalData) => {
+				let VPMatInv = new RC.Matrix4().multiplyMatrices(this.shadowMap.camera.matrixWorld, this.shadowMap.PMatInv);
+				this.shadowMap.mesh.material.setUniform("uVPMatInv", VPMatInv.toArray());
+				this.shadowMap.mesh.material.setUniform("uLightPos", this.shadowMap.camera.position.toArray());
+				this.shadowMap.mesh.material.setUniform("uCameraPos", this.camera.position.toArray());
+				this.shadowMap.mesh.material.setUniform("uFarPlane", this.shadowMap.camera.far);
+				this.shadowMap.mesh.material.setUniform("uResInv", [1.0 / this.canvas.width, 1.0 / this.canvas.height]);
+				
+				
+				return { scene: this.shadowMap.scene, camera: this.camera };
+			},
+			RC.RenderPass.TEXTURE,
+			{ width: this.canvas.width, height: this.canvas.width },
+			"lightVolumeDepthBuf",
+			[
+				{ id: "lightVolume", textureConfig: RGBA16F_LINEAR }
 			]
 		);
 		// DEPTH
@@ -570,7 +666,7 @@ class App {
 				mat.ligths = false;
 				return { 
 					material: mat,
-					textures: [textureMap.mainColor]//, textureMap.particleColor]
+					textures: [textureMap.mainColor, textureMap.lightVolume]//, textureMap.particleColor]
 				};
 			},
 			RC.RenderPass.SCREEN,
@@ -589,6 +685,8 @@ class App {
 
 		this.renderQueue.pushRenderPass(this.mainRenderPass);
 		this.renderQueue.pushRenderPass(this.depthPass);
+
+		this.renderQueue.pushRenderPass(this.lightVolumePass);
 
 		// this.renderQueue.pushRenderPass(this.particleUpdatePass);
 		// this.renderQueue.pushRenderPass(this.particleDrawPass);
@@ -650,8 +748,9 @@ class App {
 			// TODO
 			this.sceneObjects = []
 			this.scene.traverse((object) => {
-				if (object instanceof RC.Mesh && object.material instanceof RC.CustomShaderMaterial) {
-					object.material.addMap(this.shadowMap.texture);
+				if (object instanceof RC.Mesh) {
+					if (object.material instanceof RC.CustomShaderMaterial)
+						object.material.addMap(this.shadowMap.texture);
 					//let mat = new RC.MeshBasicMaterial();
 					let mat = new RC.CustomShaderMaterial("shadow_map");
 					//mat.lights = false;
@@ -770,11 +869,15 @@ class App {
 		this.camera.aspect = this.canvas.width / this.canvas.height;
 		this.PMatInv.getInverse(this.camera.projectionMatrix);
 		this.renderer.updateViewport(this.canvas.width, this.canvas.height);
+		
+		this.shadowMap.PMatInv.getInverse(this.shadowMap.camera.projectionMatrix);
 
 		// Update render passes
 		this.perlinNoisePass.viewport = { width: this.canvas.width, height: this.canvas.height };
 		this.mainRenderPass.viewport = { width: this.canvas.width, height: this.canvas.height };
 		this.depthPass.viewport = { width: this.canvas.width, height: this.canvas.height };
+
+		this.lightVolumePass.viewport = { width: this.canvas.width, height: this.canvas.height };
 
 		this.dofDownsamplePass.viewport = { width: this.canvas.width * 0.25, height: this.canvas.height * 0.25 };
 		for (let i = 0; i < this.dof.numPasses; ++i) {

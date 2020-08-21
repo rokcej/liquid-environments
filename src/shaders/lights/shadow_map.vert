@@ -23,9 +23,7 @@ in vec3 VPos;       // Vertex position
     out vec3 vViewPosition;
 #fi
 
-uniform float uFarPlane;
-
-out float vFragDepth;
+out vec3 vFragPos;
 
 void main() {
     // Model view position
@@ -48,9 +46,9 @@ void main() {
 
     // Projected position
     gl_Position = PMat * VPos4;
-	vFragDepth = length(VPos4.xyz / VPos4.w) / uFarPlane;
+	vFragPos = VPos4.xyz / VPos4.w;
 
-    #if (CLIPPING_PLANES)
-        vViewPosition = -VPos4.xyz;
-    #fi
+    // #if (CLIPPING_PLANES)
+    //     vViewPosition = -VPos4.xyz;
+    // #fi
  }
