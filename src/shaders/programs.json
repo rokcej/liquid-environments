@@ -89,13 +89,19 @@
 			"vertex": "lights/shadow_map.vert",
 			"fragment": "lights/shadow_map.frag"
 		}
-	}
-	,
+	},
 	"custom_light_volume": {
 		"description": "Polygonal light volume.",
 		"shaders": {
 			"vertex": "lights/light_volume.vert",
 			"fragment": "lights/light_volume.frag"
+		}
+	},
+	"custom_airlight_lookup": {
+		"description": "Airlight function lookup table.",
+		"shaders": {
+			"vertex": "lights/airlight_lookup.vert",
+			"fragment": "lights/airlight_lookup.frag"
 		}
 	}
 }

@@ -105,7 +105,7 @@ class App {
 		this.pLight2.position = new RC.Vector3(10.0, 10.0, 10.0);
 		this.aLight = new RC.AmbientLight(new RC.Color("#FFFFFF"), 0.05);
 
-		this.pLight.add(new RC.Cube(1.0, this.pLight.color));
+		//this.pLight.add(new RC.Cube(1.0, this.pLight.color));
 		this.pLight2.add(new RC.Cube(1.0, this.pLight.color));
 
 		this.lights = [this.pLight, this.pLight2, this.aLight]; // , this.dLight];
@@ -225,6 +225,7 @@ class App {
 		// Shadow map
 		this.shadowMap = {
 			size: 1024,
+			lookupSize: 256,
 			camera: new RC.PerspectiveCamera(90, 1.0, 0.1, 500.0),
 			//lightSpaceMat: new RC.Matrix4(),
 			scene: new RC.Scene(),
@@ -471,20 +472,49 @@ class App {
 				{ id: "mainColor", textureConfig: RC.RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG }
 			]
 		);
+		// AIRLIGHT LOOKUP
+		this.airlightLookupPass = new RC.RenderPass(
+			RC.RenderPass.POSTPROCESS,
+			(textureMap, additionalData) => {},
+			(textureMap, additionalData) => {
+				let mat = new RC.CustomShaderMaterial("airlight_lookup", {
+					"uLookupSize": this.shadowMap.lookupSize
+				});
+				mat.ligths = false;
+				return { material: mat, textures: []};
+			},
+			RC.RenderPass.TEXTURE,
+			{ width: this.shadowMap.lookupSize, height: this.shadowMap.lookupSize },
+			"dummy123",
+			[
+				{ id: "airlightLookup", textureConfig: RGBA16F_LINEAR }
+			]
+		);
 		// LIGHT VOLUME
 		this.lightVolumePass = new RC.RenderPass(
 			RC.RenderPass.BASIC,
 			(textureMap, additionalData) => {
 				//this.shadowMap.mesh.material.addMap(textureMap.mainDepthBuf);
 				this.shadowMap.mesh.material.addMap(textureMap.mainDepthDist);
+				this.shadowMap.mesh.material.addMap(textureMap.airlightLookup);
 			},
 			(textureMap, additionalData) => {
+				let lightDir = new RC.Vector3().subVectors(this.camera.position, this.shadowMap.camera.position);
+				let lightDist = lightDir.length();
+				if (lightDist > 0.0)
+					lightDir.divideScalar(lightDist);
+
+
 				let VPMatInv = new RC.Matrix4().multiplyMatrices(this.shadowMap.camera.matrixWorld, this.shadowMap.PMatInv);
 				this.shadowMap.mesh.material.setUniform("uVPMatInv", VPMatInv.toArray());
 				this.shadowMap.mesh.material.setUniform("uLightPos", this.shadowMap.camera.position.toArray());
 				this.shadowMap.mesh.material.setUniform("uCameraPos", this.camera.position.toArray());
+				this.shadowMap.mesh.material.setUniform("uLightDir", lightDir.toArray());
+				this.shadowMap.mesh.material.setUniform("uLightDist", lightDist);
+				this.shadowMap.mesh.material.setUniform("uLookupSize", this.shadowMap.lookupSize);
 				this.shadowMap.mesh.material.setUniform("uFarPlane", this.shadowMap.camera.far);
 				this.shadowMap.mesh.material.setUniform("uResInv", [1.0 / this.canvas.width, 1.0 / this.canvas.height]);
+				this.shadowMap.mesh.material.setUniform("uSeed", Math.random());
 				
 				
 				return { scene: this.shadowMap.scene, camera: this.camera };
@@ -706,6 +736,7 @@ class App {
 		this.renderQueue.pushRenderPass(this.mainRenderPass);
 		this.renderQueue.pushRenderPass(this.depthPass);
 
+		this.renderQueue.pushRenderPass(this.airlightLookupPass);
 		this.renderQueue.pushRenderPass(this.lightVolumePass);
 
 		this.renderQueue.pushRenderPass(this.particleUpdatePass);
@@ -864,7 +895,10 @@ class App {
 		//this.renderer.render(this.scene, this.camera);
 		this.renderQueue.render();
 
-		if (this.once++ > 200) {
+		if (this.once == 200) {
+			this.renderQueue.removeRenderPass(this.airlightLookupPass);
+		}
+		if (this.once > 200) {
 			// Swap WebGL textures
 			let glmap = this.renderer._glManager._textureManager._cached_textures;
 			let tex1 = glmap.get(this.particleTex);
@@ -878,6 +912,7 @@ class App {
 			// map.particlesRead = map.particlesWrite;
 			// map.particlesWrite = temp;
 		}
+		++this.once;	
 	}
 
 	resize() {

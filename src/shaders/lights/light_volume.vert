@@ -1,5 +1,5 @@
 #version 300 es
-precision mediump float;
+precision highp float;
 
 uniform mat4 MVMat; // Model View Matrix
 uniform mat4 PMat;  // Projection Matrix
@@ -32,6 +32,9 @@ out vec3 vEyePos;
 out float vLightDist;
 
 
+
+out vec3 vPos;
+
 void main() {
 	vec3 pos;
 	float lightDist;
@@ -54,4 +57,5 @@ void main() {
 	gl_Position = PMat * eyePos4;
 	vEyePos = eyePos4.xyz / eyePos4.w;
 	vLightDist = lightDist;
+	vPos = pos;
 }

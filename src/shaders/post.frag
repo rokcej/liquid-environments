@@ -28,5 +28,5 @@ void main() {
 	float b = texture(material.texture0, (fragUV - 0.5) * (1.0 + off.b) + 0.5).b;
 
 	oColor = vec4(vec3(r, g, b) + tex1, 1.0);
-	//oColor = vec4(tex0 + tex1, 1.0);
+	//oColor = vec4(tex0, 1.0);
 }

@@ -79,7 +79,10 @@ float rand_constant(vec4 p) {
 
 
 
-// 4D Perlin noise, my own implementation
+
+////////////////////////////////////////////
+// 4D Perlin noise (using RNG algorithms) //
+////////////////////////////////////////////
 
 // Random unit-length vector
 // https://mathworld.wolfram.com/HyperspherePointPicking.html
@@ -177,8 +180,9 @@ vec3 getVelocityP(vec3 pos, float time) {
 
 
 
-
-// Ken Perlin's 4D Improved Perlin Noise
+//////////////////////////////////////////////////////
+// 4D Perlin Noise (using permutation lookup table) //
+//////////////////////////////////////////////////////
 
 const int _P[256] = int[] (
 	151,160,137,91,90,15,
@@ -306,17 +310,9 @@ vec3 getVelocityI(vec3 pos, float time) {
 
 
 
-
-
-
-
-
-
-
-
-
-
-// 4D Simplex noise, https://github.com/ashima/webgl-noise/blob/master/src/noise4D.glsl
+/////////////////////////////////////////////////////////////////////////////////////////
+// 4D Simplex noise https://github.com/ashima/webgl-noise/blob/master/src/noise4D.glsl //
+/////////////////////////////////////////////////////////////////////////////////////////
 
 vec4 mod289(vec4 x) {
   return x - floor(x * (1.0 / 289.0)) * 289.0; }
@@ -467,9 +463,6 @@ vec3 getVelocityS(vec3 pos, float time) {
 
 	return vec3(dp3_dy - dp2_dz, dp1_dz - dp3_dx, dp2_dx - dp1_dy) * uMovementSpeed;
 }
-
-
-
 
 
 
