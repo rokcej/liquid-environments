@@ -29,10 +29,6 @@ uniform vec2 uCameraRange; // Camera near & far values
 uniform vec3 uLiquidColor;
 uniform vec3 uLiquidAtten;
 
-uniform float f; // Focal length
-uniform float a; // Aperture radius
-uniform float v0; // Distance in focus
-
 in vec4 vColor;
 in vec3 vPos;
 in float vProjSize;
@@ -45,22 +41,6 @@ vec3 applyFog(vec3 color, float depth, float noise) {
 	vec3 transmittance = exp(-uLiquidAtten * depth * noise);
 
 	return color * transmittance; // + uLiquidColor * (1.0 - transmittance.b);
-}
-
-vec3 calcLight(Light light) {
-	if (!light.directional) { // Point light
-		// Attenuation
-		float dist = length(light.position - vPos);
-		float attenuation = 1.0f / (1.0f + 0.01f * dist + 0.0001f * (dist * dist));
-
-		// Transmittance
-		vec3 transmittance = exp(-uLiquidAtten * dist);
-
-		return light.color * transmittance * attenuation;
-	} else { // Directional light
-		vec3 lightDir = normalize(light.position);
-		return light.color;
-	}
 }
 
 void main() {
@@ -93,22 +73,10 @@ void main() {
 			opacity *= smoothstep(1.0, 0.0, (radius - threshold) / (1.0 - threshold));
 	}
 
-	// Light
-	vec3 illum = ambient;
-	#if (!NO_LIGHTS)
-		#for lightIdx in 0 to NUM_LIGHTS
-			illum += calcLight(lights[##lightIdx]);
-		#end
-	#fi
-
 	// Perlin noise
 	float noise = texture(material.texture2, uv).r;
 	float noise_2 = texture(material.texture3, uv).r * 0.5 + 0.25;
-
-    // Pseudo-DOF
-    float coc = a * abs(f / (v0 - f)) * abs(v0 / vDepthDist - 1.0);
-	opacity /= 1.0 + coc * 0.5;
 	
 	// Color
-	oColor = vec4(applyFog(vColor.rgb * illum, currentDepth, noise), opacity);
+	oColor = vec4(applyFog(vColor.rgb, currentDepth, noise), opacity);
 }

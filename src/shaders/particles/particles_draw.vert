@@ -1,34 +1,105 @@
 #version 300 es
 precision mediump float;
 
-uniform mat4 MVMat; // Model View Matrix
-uniform mat4 PMat;  // Projection Matrix
+struct FrustumLight {
+	vec3 position;
+	vec3 color;
+	mat4 matrix;
+	float farPlane;
+};
 
-in vec3 VPos;       // Vertex position
+struct Light {
+	bool directional;
+	vec3 position;
+	vec3 color;
+};
 
 struct Material {
     vec3 diffuse;
-
+	
 	#for I_TEX in 0 to NUM_TEX
 		sampler2D texture##I_TEX;
 	#end
 };
 
+uniform mat4 MVMat; // Model View Matrix
+uniform mat4 PMat;  // Projection Matrix
+
+in vec3 VPos;       // Vertex position
+
+#if (!NO_LIGHTS)
+uniform Light lights[##NUM_LIGHTS];
+#fi
 #if (TRANSPARENT)
     uniform float alpha;
 #else
     float alpha = 1.0;
 #fi
-
+uniform vec3 ambient;
 uniform Material material;
+
+uniform FrustumLight uFrustumLights[##NUM_FRUSTUM_LIGHTS];
+
 uniform float uvOff;
 uniform float pointSize;
+uniform float uIntensity;
+
+uniform vec3 uLiquidColor;
+uniform vec3 uLiquidAtten;
+
+uniform float f; // Focal length
+uniform float a; // Aperture radius
+uniform float v0; // Distance in focus
 
 // Output transformed vertex position
 out vec4 vColor;
 out vec3 vPos;
 out float vProjSize;
 out float vDepthDist;
+
+
+vec3 calcLightAtten(float dist) {
+    // Attenuation
+    float attenuation = 1.0f / (1.0f + 0.01f * dist + 0.0001f * (dist * dist));
+    // Transmittance
+    vec3 transmittance = exp(-uLiquidAtten * dist);
+    return attenuation * transmittance;
+}
+
+vec3 calcLight(Light light) {
+	if (!light.directional) { // Point light
+		float dist = length(light.position - vPos);
+		return light.color * calcLightAtten(dist);
+	} else { // Directional light
+		vec3 lightDir = normalize(light.position);
+		return light.color;
+	}
+}
+
+vec3 calcFrustumLight(int index, sampler2D tex, vec3 posWorld) {
+    vec4 posLS4 = uFrustumLights[index].matrix * vec4(posWorld, 1.0);
+	vec3 posLS = (posLS4.xyz / posLS4.w) * 0.5 + 0.5;
+	if (posLS.x > 0.0 && posLS.x < 1.0 && posLS.y > 0.0 && posLS.y < 1.0 && posLS.z < 1.0) {
+		vec3 lightDir = uFrustumLights[index].position - vPos;
+		float lightCurrentDepth = length(lightDir);
+		if (lightCurrentDepth > 0.0)
+			lightDir /= lightCurrentDepth;
+
+        float bias = 0.005;
+        float lightClosestDepth = texture(tex, posLS.xy).r * uFrustumLights[index].farPlane;
+		vec2 texelSize = 1.0 / vec2(textureSize(tex, 0));
+		float shadow = lightCurrentDepth - bias > lightClosestDepth ? 1.0 : 0.0;
+
+		// Soft shadow edge
+		float threshold = 0.15;
+		float edgeDist = min(min(posLS.x, 1.0 - posLS.x), min(posLS.y, 1.0 - posLS.y));
+		float atten = 1.0 - smoothstep(0.0, threshold, edgeDist);
+		shadow = min(shadow + atten, 1.0); 
+
+		return (1.0 - shadow) * uFrustumLights[index].color * calcLightAtten(lightCurrentDepth);
+	}
+	return vec3(0.0);
+}
 
 
 void main() {
@@ -56,6 +127,26 @@ void main() {
     float fadeTime = 1.0;
     opacity *= min(smoothstep(0.0, fadeTime, age), smoothstep(0.0, fadeTime, life));
 
-    vColor = vec4(material.diffuse, opacity * alpha);
+    // Pseudo-DOF
+    float coc = a * abs(f / (v0 - f)) * abs(v0 / vDepthDist - 1.0);
+	opacity /= 1.0 + coc * 0.5;
+
+    // RenderCore Lights
+	vec3 illum = ambient;
+	#if (!NO_LIGHTS)
+		#for lightIdx in 0 to NUM_LIGHTS
+			illum += calcLight(lights[##lightIdx]);
+		#end
+	#fi
+    
+    // Volume lights
+    #for I_TEX in 4 to NUM_TEX
+		illum += calcFrustumLight(##I_TEX - 4, material.texture##I_TEX, pos);
+	#end
+
+    vec3 color = uIntensity * illum * material.diffuse;
+
+
+    vColor = vec4(color, opacity * alpha);
     gl_PointSize = vProjSize;
 }

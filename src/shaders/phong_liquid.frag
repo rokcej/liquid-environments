@@ -195,9 +195,8 @@ vec3 calcFrustumLight(int index, sampler2D tex, vec3 normal, vec3 viewDir) {
 		shadow = min(shadow + atten, 1.0); 
 
 		return (1.0 - shadow) * calcPointLight(Light(false, uFrustumLights[index].position, uFrustumLights[index].color), normal, viewDir);
-	} else {
-		return vec3(0.0);
 	}
+	return vec3(0.0);
 }
 
 
@@ -241,44 +240,6 @@ void main() {
 
 	// Calculate combined light contribution
 	vec3 combined = ambient;
-
-	// float shadow = 0.0;
-	// #if (TEXTURE)
-	// vec3 posLS = (fragVPos4LS.xyz / fragVPos4LS.w) * 0.5 + 0.5;
-	// if (posLS.x > 0.0 && posLS.x < 1.0 && posLS.y > 0.0 && posLS.y < 1.0 && posLS.z < 1.0) {
-	// 	//float lightClosestDepth = texture(material.texture0, posLS.xy).r;
-	// 	//float lightCurrentDepth = posLS.z;
-	// 	float lightCurrentDepth = length(fragVPos4LV.xyz / fragVPos4LV.w);
-	// 	lightCurrentDepth = length(fragVPos - uFrustumLights[0].position);
-
-	// 	// TODO fix bias
-	// 	//float bias = 0.05;
-	// 	vec3 lightDir = normalize(lights[0].position - fragVPos);
-	// 	float bias = max(0.2 * (1.0 - dot(normal, lightDir)), 0.05);
-	// 	//shadow = lightCurrentDepth - bias > lightClosestDepth ? 1.0 : 0.0;
-
-
-	// 	vec2 texelSize = 1.0 / vec2(textureSize(material.texture0, 0));
-
-	// 	for (int x = -1; x <= 1; ++x) {
-	// 		for (int y = -1; y <= 1; ++y) {
-	// 			float pcfDepth = texture(material.texture0, posLS.xy + vec2(x, y) * texelSize).r * uFarPlane; 
-	// 			shadow += lightCurrentDepth - bias > pcfDepth ? 1.0 : 0.0;        
-	// 		}    
-	// 	}
-	// 	shadow /= 9.0;
-
-	// 	// // http://www.opengl-tutorial.org/intermediate-tutorials/tutorial-16-shadow-mapping/#poisson-sampling
-	// 	// for (int i = 0; i < 9; ++i) {
-	// 	// 	int idx = int(rand(fragVPos) * 47.999);
-	// 	// 	float poissonDepth = texture(material.texture0, posLS.xy + (poissonDisk[idx] - vec2(0.5)) * texelSize * 2.0).r * uFarPlane; 
-	// 	// 	shadow += lightCurrentDepth - bias > poissonDepth ? 1.0 : 0.0;  
-	// 	// }
-	// 	// shadow /= 9.0;
-
-	// }
-	
-	// #fi
 
 	#for I_LIGHT in 0 to NUM_FRUSTUM_LIGHTS
 		combined += calcFrustumLight(##I_LIGHT, material.texture##I_LIGHT, normal, viewDir);

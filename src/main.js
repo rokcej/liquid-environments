@@ -18,7 +18,8 @@ class App {
 		this.mouseInput.setSourceObject(window);
 
 		this.initSettings();
-		this.initMeshes();
+		this.initParticles();
+		this.initLightVolumes();
 		this.initScene();
 		this.initRenderQueue();
 		this.resize();
@@ -67,9 +68,80 @@ class App {
 			frustum: [],
 			point: []
 		};
+		// Particles
+		this.particles = {
+			res: 1024,
+			opacity: 1,
+			intensity: 2,
+			size: 12,
+			components: 3, // Number of texels per particle
+			scene: new RC.Scene()
+		}
 	}
 
-	initMeshes() {
+	initParticles() {
+		let sz = this.particles.res;
+		let n_comp = this.particles.components;
+
+		let particleData = new Float32Array(sz * sz * n_comp * 4);
+		for (let y = 0; y < sz; ++y) {
+			for (let x = 0; x < sz; ++x) {
+				let i = y * sz + x;
+				// Life
+				particleData[n_comp * 4 * i + 3] = 0.0;
+				// Random
+				particleData[n_comp * 4 * i + 7] = Math.random();
+			}
+		}
+
+		this.particles.texture = [
+			new RC.Texture(particleData,
+				RC.Texture.ClampToEdgeWrapping, RC.Texture.ClampToEdgeWrapping,
+				RC.Texture.NearestFilter, RC.Texture.NearestFilter,
+				RC.Texture.RGBA32F, RC.Texture.RGBA, RC.Texture.FLOAT,
+				sz * n_comp, sz),
+			new RC.Texture(null,
+				RC.Texture.ClampToEdgeWrapping, RC.Texture.ClampToEdgeWrapping,
+				RC.Texture.NearestFilter, RC.Texture.NearestFilter,
+				RC.Texture.RGBA32F, RC.Texture.RGBA, RC.Texture.FLOAT,
+				sz * n_comp, sz)
+		];
+
+		// Points
+		let vertices = new Float32Array(sz * sz * 3);
+		for (let y = 0; y < sz; ++y) {
+			for (let x = 0; x < sz; ++x) {
+				let i = x + sz * y;
+				vertices[3 * i + 0] = (x + 0.5 / n_comp) / sz;
+				vertices[3 * i + 1] = (y + 0.5) / sz;
+				vertices[3 * i + 2] = 0.0;
+			}
+		}
+
+		let geo = new RC.Geometry();
+		geo.vertices = new RC.BufferAttribute(vertices, 3);
+
+		let mat = new RC.CustomShaderMaterial("particles_draw", { "uvOff": 1.0 / (sz * n_comp) });
+		mat.color = new RC.Color(1, 1, 1);
+		mat.transparent = true;
+		mat.opacity = this.particles.opacity;
+		mat.depthWrite = true;
+		mat.depthTest = false;
+		mat.usePoints = true;
+		mat.pointSize = this.particles.size;
+		mat.lights = true;
+		mat.addMap(this.particles.texture[1]);
+
+		this.particles.mesh = new RC.Mesh(geo, mat);
+		this.particles.mesh.renderingPrimitive = RC.POINTS;
+		this.particles.mesh.frustumCulled = false;
+
+		//this.scene.add(this.particles.mesh);
+		this.particles.scene.add(this.particles.mesh);
+
+	}
+
+	initLightVolumes() {
 		// Frustum geometry
 		let sz = this.lights.shadowRes;
 		let vbo = new Float32Array((sz * sz + 1) * 3);
@@ -182,7 +254,6 @@ class App {
 	initScene() {
 		/// Main scene
 		this.scene = new RC.Scene();
-		this.particleScene = new RC.Scene();
 
 		this.camera = new RC.PerspectiveCamera(60, this.canvas.width / this.canvas.height, 0.1, 1000);
 		this.camera.position = new RC.Vector3(0, 0.75, 4);
@@ -193,17 +264,20 @@ class App {
 		this.cameraManager.addOrbitCamera(this.camera, new RC.Vector3(0, 0, 0));
 		this.cameraManager.activeCamera = this.camera;
 
+
 		// Liquid color
 		this.liquidColor = new RC.Color(0.0, 0.18, 0.4); // (0, 0.3, 0.7);
 		this.liquidColor.multiplyScalar(0.5);
 		this.liquidAtten = new RC.Vector3(0.07, 0.06, 0.05);
 		this.liquidAtten.multiplyScalar(1.8);
 
+
 		// Volumetric lights
 		this.addFrustumLight(new RC.Vector3(-4, 10, -20), new RC.Vector3(0, 0, 0), new RC.Color(0.8, 0.8, 0.2)).intensity = 0.7;
 		this.addFrustumLight(new RC.Vector3(10, 10, 10),  new RC.Vector3(0, 0, 0), new RC.Color(1.0, 0.2, 0.5)).intensity = 0.9;
-		this.addFrustumLight(new RC.Vector3(20, 40, -8),  new RC.Vector3(0, 0, 0), new RC.Color(0.9, 0.1, 1.0)).intensity = 2.0;
+		this.addFrustumLight(new RC.Vector3(20, 40, -8),  new RC.Vector3(0, 0, 0), new RC.Color(0.9, 0.85, 1.0)).intensity = 1.8;
 		this.lights.frustum[2].volumeIntensity = 8000.0
+
 
 		// RenderCore Lights
 		// this.dLight = new RC.DirectionalLight(new RC.Color("#FFFFFF"), 1.0);
@@ -223,10 +297,10 @@ class App {
 		// for (let l of this.lights)
 		// 	this.particleScene.add(l);
 
+
 		// Plane
 		let plane = new RC.Quad({x: -64, y: 64}, {x: 64, y: -64}, this.createPhongMat());
 		plane.material.side = RC.FRONT_AND_BACK_SIDE;
-
 
 		let pixelData = new Uint8Array([
 			230, 230, 230, 255
@@ -248,123 +322,24 @@ class App {
 		
 		this.scene.add(plane2);
 
-		// Texture based particles
-		let n_comp = 3;
-		this.n_comp = n_comp;
-		let sz = 1024;
-		let particleData = new Float32Array(sz * sz * n_comp * 4);
-
-		for (let y = 0; y < sz; ++y) {
-			for (let x = 0; x < sz; ++x) {
-				let i = y * sz + x;
-				// Life
-				particleData[n_comp * 4 * i + 3] = 0.0;
-				// Random
-				particleData[n_comp * 4 * i + 7] = Math.random();
-			}
-		}
-
-		this.particleTex = new RC.Texture(particleData,
-			RC.Texture.ClampToEdgeWrapping, RC.Texture.ClampToEdgeWrapping,
-			RC.Texture.NearestFilter, RC.Texture.NearestFilter,
-			RC.Texture.RGBA32F, RC.Texture.RGBA, RC.Texture.FLOAT,
-			sz * n_comp, sz
-		);
-
-		this.particleTex2 = new RC.Texture(null,
-			RC.Texture.ClampToEdgeWrapping, RC.Texture.ClampToEdgeWrapping,
-			RC.Texture.NearestFilter, RC.Texture.NearestFilter,
-			RC.Texture.RGBA32F, RC.Texture.RGBA, RC.Texture.FLOAT,
-			sz * n_comp, sz
-		);
-
-		// Points
-		let vertices = new Float32Array(sz * sz * 3);
-		for (let y = 0; y < sz; ++y) {
-			for (let x = 0; x < sz; ++x) {
-				let i = x + sz * y;
-				vertices[3 * i + 0] = (x + 0.5 / n_comp) / sz;
-				vertices[3 * i + 1] = (y + 0.5) / sz;
-				vertices[3 * i + 2] = 0.0;
-			}
-		}
-
-		let geo = new RC.Geometry();
-		geo.vertices = new RC.BufferAttribute(vertices, 3);
-
-		let mat = new RC.CustomShaderMaterial("particles_draw", { "uvOff": 1.0 / (sz * n_comp) });
-		mat.color = new RC.Color(1, 1, 1);
-		mat.transparent = true;
-		mat.opacity = 1.0;
-		mat.depthWrite = true;
-		mat.depthTest = false;
-		mat.usePoints = true;
-		mat.pointSize = 12.0;
-		mat.lights = true;
-		mat.addMap(this.particleTex2);
-
-		this.particleMesh = new RC.Mesh(geo, mat);
-		this.particleMesh.renderingPrimitive = RC.POINTS;
-		this.particleMesh.frustumCulled = false;
-
-		//this.scene.add(this.particleMesh);
-		this.particleScene.add(this.particleMesh);
 
 		// Display particle textures
 		let q1 = new RC.Quad({x: -1, y: -.5}, {x: 1, y: .5}, new RC.MeshBasicMaterial());
 		q1.position = new RC.Vector3(-3,0,-2);
 		q1.material.side = RC.Material.FRONT_AND_BACK_SIDE;
 		q1.material.color = new RC.Color("#FFFFFF");
-		q1.material.addMap(this.particleTex);
+		q1.material.addMap(this.particles.texture[0]);
 		//this.scene.add(q1);
 
 		let q2 = new RC.Quad({x: -1, y: -.5}, {x: 1, y: .5}, new RC.MeshBasicMaterial());
 		q2.position = new RC.Vector3(3,0,-2);
 		q2.material.side = RC.Material.FRONT_AND_BACK_SIDE;
 		q2.material.color = new RC.Color("#FFFFFF");
-		q2.material.addMap(this.particleTex2);
+		q2.material.addMap(this.particles.texture[1]);
 		//this.scene.add(q2);
 
 		this.q1 = q1;
 		this.q2 = q2;
-
-
-
-
-		// Shadow map
-		this.shadowMap = {
-			size: 1024,
-			lookupSize: 256,
-			camera: new RC.PerspectiveCamera(90, 1.0, 0.1, 500.0),
-			//lightSpaceMat: new RC.Matrix4(),
-			scene: new RC.Scene(),
-			// texture: new RC.Texture(),
-		};
-		this.shadowMap.texture = new RC.Texture(
-			null, RC.Texture.RepeatWrapping, RC.Texture.RepeatWrapping,	RC.Texture.NearestFilter, RC.Texture.NearestFilter,
-			RC.Texture.DEPTH_COMPONENT24, RC.Texture.DEPTH_COMPONENT, RC.Texture.UNSIGNED_INT, this.shadowMap.size, this.shadowMap.size
-		);
-		this.shadowMap.camera.position = new RC.Vector3(-4.0, 10.0, -20.0);
-		this.shadowMap.camera.lookAt(new RC.Vector3(0.0, 0.0, 0.0), new RC.Vector3(0.0, 1.0, 0.0));
-		this.shadowMap.camera.updateMatrixWorld();
-		this.shadowMap.camera.matrixWorldInverse.getInverse(this.shadowMap.camera.matrixWorld);
-		//this.shadowMap.lightSpaceMat.multiplyMatrices(this.shadowMap.camera.projectionMatrix, this.shadowMap.camera.matrixWorldInverse);
-		
-		this.shadowMap.PMatInv = new RC.Matrix4().getInverse(this.shadowMap.camera.projectionMatrix);
-
-		mat = new RC.CustomShaderMaterial("light_volume", {});
-		mat.color = new RC.Color(1, 1, 1);
-		mat.depthWrite = true;
-		mat.depthTest = false;
-		mat.lights = false;
-		mat.transparent = true;
-		mat.side = RC.FRONT_AND_BACK_SIDE;
-		mat.addMap(this.shadowMap.texture);
-		
-
-		this.shadowMap.mesh = new RC.Mesh(this.lights.frustumGeo, mat);
-		this.shadowMap.mesh.frustumCulled = false;
-		this.shadowMap.scene.add(this.shadowMap.mesh);
 	}
 
 	initRenderQueue() {
@@ -411,29 +386,29 @@ class App {
 			(textureMap, additionalData) => {},
 			(textureMap, additionalData) => {
 				let mat = new RC.CustomShaderMaterial("particles_update", {
-					"uRes": [this.particleTex.width, this.particleTex.height],
+					"uRes": [this.particles.texture[0].width, this.particles.texture[0].height],
 					"uDT": this.timer.delta,
 					"uTime": this.timer.curr,
 					"uSeed": Math.random(),
 					"uCameraPos": this.camera.position.toArray(),
-					"uNumComp": this.n_comp
+					"uNumComp": this.particles.components
 				});
 				mat.ligths = false;
 				return { material: mat, textures: [textureMap.particlesRead] };
 			},
 			RC.RenderPass.TEXTURE,
-			{ width: this.particleTex.width, height: this.particleTex.height },
+			{ width: this.particles.texture[0].width, height: this.particles.texture[0].height },
 			"dummy1",
 			[{
 				id: "particlesWrite",
 				textureConfig: {
-					wrapS: this.particleTex.wrapS,
-					wrapT: this.particleTex.wrapT,
-					minFilter: this.particleTex.minFilter,
-					magFilter: this.particleTex.magFilter,
-					internalFormat: this.particleTex.internalFormat,
-					format: this.particleTex.format,
-					type: this.particleTex.type
+					wrapS: this.particles.texture[0].wrapS,
+					wrapT: this.particles.texture[0].wrapT,
+					minFilter: this.particles.texture[0].minFilter,
+					magFilter: this.particles.texture[0].magFilter,
+					internalFormat: this.particles.texture[0].internalFormat,
+					format: this.particles.texture[0].format,
+					type: this.particles.texture[0].type
 				}
 			}]
 		);
@@ -441,24 +416,32 @@ class App {
 		this.particleDrawPass = new RC.RenderPass(
 			RC.RenderPass.BASIC,
 			(textureMap, additionalData) => {
-				this.particleMesh.material.addMap(textureMap.mainDepthDist);
-				this.particleMesh.material.addMap(textureMap.perlinNoise);
-				this.particleMesh.material.addMap(textureMap.perlinNoise2);
+				this.particles.mesh.material.addMap(textureMap.mainDepthDist);
+				this.particles.mesh.material.addMap(textureMap.perlinNoise);
+				this.particles.mesh.material.addMap(textureMap.perlinNoise2);
+				// Shadow maps
+				for (let l of this.lights.frustum)
+					this.particles.mesh.material.addMap(l.texture);
+				this.particles.mesh.material.addSBValue("NUM_FRUSTUM_LIGHTS", this.lights.frustum.length);
 			},
 			(textureMap, additionalData) => {
-				this.particleMesh.material.setUniform("uRes", [this.canvas.width, this.canvas.height]);
-				this.particleMesh.material.setUniform("uCameraRange", [this.camera.near, this.camera.far]);
-				this.particleMesh.material.setUniform("uLiquidColor", this.liquidColor.toArray());
-				this.particleMesh.material.setUniform("uLiquidAtten", this.liquidAtten.toArray());
+				this.particles.mesh.material.opacity = this.particles.opacity;
+				this.particles.mesh.material.pointSize = this.particles.size;
+				this.particles.mesh.material.setUniform("uIntensity", this.particles.intensity);
+
+				this.particles.mesh.material.setUniform("uRes", [this.canvas.width, this.canvas.height]);
+				this.particles.mesh.material.setUniform("uCameraRange", [this.camera.near, this.camera.far]);
+				this.particles.mesh.material.setUniform("uLiquidColor", this.liquidColor.toArray());
+				this.particles.mesh.material.setUniform("uLiquidAtten", this.liquidAtten.toArray());
 				
-				this.particleMesh.material.setUniform("f", this.dof.f);
-				this.particleMesh.material.setUniform("a", this.dof.a);
-				this.particleMesh.material.setUniform("v0", this.dof.v0);
+				this.particles.mesh.material.setUniform("f", this.dof.f);
+				this.particles.mesh.material.setUniform("a", this.dof.a);
+				this.particles.mesh.material.setUniform("v0", this.dof.v0);
 
 				// for (let l of this.lights)
 				// 	this.particleScene.add(l);
 
-				return { scene: this.particleScene, camera: this.camera };
+				return { scene: this.particles.scene, camera: this.camera };
 			},
 			RC.RenderPass.TEXTURE,
 			{ width: this.canvas.width, height: this.canvas.height },
@@ -490,76 +473,45 @@ class App {
 				]
 			));
 		}
-		this.shadowPass = new RC.RenderPass(
-			RC.RenderPass.BASIC,
-			(textureMap, additionalData) => {},
-			(textureMap, additionalData) => {
-				// this.scene.traverse((object) => {
-				// 	if (object instanceof RC.Mesh && object.material instanceof RC.CustomShaderMaterial) {
-				// 	}
-				// });
-				for (let object of this.sceneObjects) {
-					object.material = object.material_temp;
-					object.material.setUniform("uLightPos", this.shadowMap.camera.position.toArray());
-					object.material.setUniform("uFarPlane", this.shadowMap.camera.far);
-				}
-				
-				return { scene: this.scene, camera: this.shadowMap.camera };
-			},
-			RC.RenderPass.TEXTURE,
-			{ width: this.shadowMap.size, height: this.shadowMap.size },
-			"shadowDepthBuf",
-			[
-				//{ id: "shadowColor", textureConfig: RC.RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG }
-			]
-		);
 		// MAIN
 		this.mainRenderPass = new RC.RenderPass(
 			RC.RenderPass.BASIC,
-			(textureMap, additionalData) => {
-				// this.scene.traverse((object) => {
-				// 	if (object instanceof RC.Mesh && object.material instanceof RC.CustomShaderMaterial) {
-				// 		object.material.addMap(textureMap.shadowDepthBuf);
-				// 	}
-				// });
-				// for (let object of this.sceneObjects) {
-				// 	object.material_main.addMap(textureMap.shadowDepthBuf);
-				// }
-			},
+			(textureMap, additionalData) => {},
 			(textureMap, additionalData) => {
 				for (let object of this.sceneObjects) {
 					object.material = object.material_main;
 					
 					if (object.material.programName === "custom_phong_liquid") {                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
 						object.material.setUniform("uMMat", object.matrix.toArray());
+					}
+				}
 
 
-						// //object.material.setUniform("uLSMat", this.shadowMap.lightSpaceMat.toArray());
-						// object.material.setUniform("uLPMat", this.shadowMap.camera.projectionMatrix.toArray());
-						// object.material.setUniform("uLVMat", this.shadowMap.camera.matrixWorldInverse.toArray());
-						// object.material.setUniform("uFarPlane", this.shadowMap.camera.far);
+				for (let i = 0; i < this.lights.frustum.length; ++i) {
+					let prefix = "uFrustumLights[" + i + "].";
+					let light = this.lights.frustum[i];
 
-						// For some reason I have to manually do this?????
-						this.camera.updateMatrixWorld();
-						this.camera.matrixWorldInverse.getInverse(this.camera.matrixWorld);
+					let lightMatrix = new RC.Matrix4().multiplyMatrices(light.camera.projectionMatrix, light.camera.matrixWorldInverse);
+					// // Apply light intensity
+					// let lightColor = new RC.Vector3().copy(light.color).multiplyScalar(light.intensity);
+					// Light position in view space
+					let lightPos = new RC.Vector3().copy(light.camera.position).applyMatrix4(this.camera.matrixWorldInverse);
+					let lightColor = new RC.Color().copy(light.color).multiplyScalar(light.intensity);
 
-						for (let i = 0; i < this.lights.frustum.length; ++i) {
-							let prefix = "uFrustumLights[" + i + "].";
-							let light = this.lights.frustum[i];
-
-							let lightMatrix = new RC.Matrix4().multiplyMatrices(light.camera.projectionMatrix, light.camera.matrixWorldInverse);
-							// // Apply light intensity
-							// let lightColor = new RC.Vector3().copy(light.color).multiplyScalar(light.intensity);
-							// Light position in view space
-							let lightPos = new RC.Vector3().copy(light.camera.position).applyMatrix4(this.camera.matrixWorldInverse);
-							let lightColor = new RC.Color().copy(light.color).multiplyScalar(light.intensity);
-
+					for (let object of this.sceneObjects) {
+						if (object.material.programName === "custom_phong_liquid") {
 							object.material.setUniform(prefix + "matrix", lightMatrix.toArray());
 							object.material.setUniform(prefix + "farPlane", light.camera.far);
 							object.material.setUniform(prefix + "color", lightColor.toArray());
 							object.material.setUniform(prefix + "position", lightPos.toArray());
 						}
 					}
+
+					// Also set particle mesh uniforms to save CPU cycles
+					this.particles.mesh.material.setUniform(prefix + "matrix", lightMatrix.toArray());
+					this.particles.mesh.material.setUniform(prefix + "farPlane", light.camera.far);
+					this.particles.mesh.material.setUniform(prefix + "color", lightColor.toArray());
+					this.particles.mesh.material.setUniform(prefix + "position", lightPos.toArray());
 				}
 
 				// for (let l of this.lights)
@@ -655,42 +607,6 @@ class App {
 				{ id: "lightVolume", textureConfig: RGBA16F_LINEAR }
 			]
 		);
-		// this.lightVolumePass = new RC.RenderPass(
-		// 	RC.RenderPass.BASIC,
-		// 	(textureMap, additionalData) => {
-		// 		//this.shadowMap.mesh.material.addMap(textureMap.mainDepthBuf);
-		// 		this.shadowMap.mesh.material.addMap(textureMap.mainDepthDist);
-		// 		this.shadowMap.mesh.material.addMap(textureMap.airlightLookup);
-		// 	},
-		// 	(textureMap, additionalData) => {
-		// 		let lightDir = new RC.Vector3().subVectors(this.camera.position, this.shadowMap.camera.position);
-		// 		let lightDist = lightDir.length();
-		// 		if (lightDist > 0.0)
-		// 			lightDir.divideScalar(lightDist);
-
-
-		// 		let VPMatInv = new RC.Matrix4().multiplyMatrices(this.shadowMap.camera.matrixWorld, this.shadowMap.PMatInv);
-		// 		this.shadowMap.mesh.material.setUniform("uVPMatInv", VPMatInv.toArray());
-		// 		this.shadowMap.mesh.material.setUniform("uLightPos", this.shadowMap.camera.position.toArray());
-		// 		this.shadowMap.mesh.material.setUniform("uCameraPos", this.camera.position.toArray());
-		// 		this.shadowMap.mesh.material.setUniform("uLightDir", lightDir.toArray());
-		// 		this.shadowMap.mesh.material.setUniform("uLightDist", lightDist);
-		// 		this.shadowMap.mesh.material.setUniform("uLookupSize", this.shadowMap.lookupSize);
-		// 		this.shadowMap.mesh.material.setUniform("uFarPlane", this.shadowMap.camera.far);
-		// 		this.shadowMap.mesh.material.setUniform("uResInv", [1.0 / this.canvas.width, 1.0 / this.canvas.height]);
-		// 		this.shadowMap.mesh.material.setUniform("uSeed", Math.random());
-				
-				
-		// 		return { scene: this.shadowMap.scene, camera: this.camera };
-		// 	},
-		// 	RC.RenderPass.TEXTURE,
-		// 	{ width: this.canvas.width, height: this.canvas.width },
-		// 	"dummy",
-		// 	[
-		// 		{ id: "lightVolume", textureConfig: RGBA16F_LINEAR }
-		// 	]
-		// );
-		
 		// DEPTH
 		this.depthPass = new RC.RenderPass(
 			RC.RenderPass.POSTPROCESS,
@@ -890,17 +806,15 @@ class App {
 
 		this.renderQueue = new RC.RenderQueue(this.renderer);
 
-		this.renderQueue.addTexture("particlesRead", this.particleTex);
-		this.renderQueue.addTexture("particlesWrite", this.particleTex2);
+		this.renderQueue.addTexture("particlesRead", this.particles.texture[0]);
+		this.renderQueue.addTexture("particlesWrite", this.particles.texture[1]);
 		for (let i = 0; i < this.lights.frustum.length; ++i)
 			this.renderQueue.addTexture("shadowMap" + i, this.lights.frustum[i].texture);
-		this.renderQueue.addTexture("shadowDepthBuf", this.shadowMap.texture);
 
 		this.renderQueue.pushRenderPass(this.perlinNoisePass);
 
 		for (let pass of this.shadowMapPasses)
 			this.renderQueue.pushRenderPass(pass);
-		this.renderQueue.pushRenderPass(this.shadowPass);
 
 		this.renderQueue.pushRenderPass(this.mainRenderPass);
 		this.renderQueue.pushRenderPass(this.depthPass);
@@ -940,7 +854,7 @@ class App {
 				//obj[i].position.z = 0;
 
 				// Main bunny
-				obj[i].position = new RC.Vector3(0, 0, 0);
+				obj[i].position = new RC.Vector3(-4, 9, -19);
 				obj[i].material = this.createPhongMat();
 				obj[i].material.shininess = 16;
 
@@ -967,6 +881,8 @@ class App {
 				}
 			}
 
+
+			// Add shadow maps to objects
 			// TODO
 			this.sceneObjects = []
 			this.scene.traverse((object) => {
@@ -1068,6 +984,10 @@ class App {
 	}
 
 	render() {
+		// For some reason I have to manually do this?????
+		this.camera.updateMatrixWorld();
+		this.camera.matrixWorldInverse.getInverse(this.camera.matrixWorld);
+
 		//this.renderer.render(this.scene, this.camera);
 		this.renderQueue.render();
 
@@ -1077,10 +997,10 @@ class App {
 		if (this.once > 200) {
 			// Swap WebGL textures
 			let glmap = this.renderer._glManager._textureManager._cached_textures;
-			let tex1 = glmap.get(this.particleTex);
-			let tex2 = glmap.get(this.particleTex2);
-			glmap.set(this.particleTex, tex2);
-			glmap.set(this.particleTex2, tex1);
+			let tex1 = glmap.get(this.particles.texture[0]);
+			let tex2 = glmap.get(this.particles.texture[1]);
+			glmap.set(this.particles.texture[0], tex2);
+			glmap.set(this.particles.texture[1], tex1);
 
 			// // Swap RenderCore textures
 			// let map = this.renderQueue._textureMap;
