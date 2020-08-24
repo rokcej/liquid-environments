@@ -23,18 +23,18 @@ out vec4 oColor;
 uniform bool horizontal;
 
 void main() {
-    vec2 texOffset = 1.0 / vec2(textureSize(material.texture0, 0)); // Gets size of single texel
-    vec4 color = texture(material.texture0, fragUV) * weights[0]; // Current fragment's contribution
-    if (horizontal) {
-        for (int i = 1; i < NUM_WEIGHTS; ++i) {
-            color += texture(material.texture0, fragUV + vec2(texOffset.x * float(i), 0.0)) * weights[i];
-            color += texture(material.texture0, fragUV - vec2(texOffset.x * float(i), 0.0)) * weights[i];
-        }
-    } else {
-        for (int i = 1; i < NUM_WEIGHTS; ++i) {
-            color += texture(material.texture0, fragUV + vec2(0.0, texOffset.y * float(i))) * weights[i];
-            color += texture(material.texture0, fragUV - vec2(0.0, texOffset.y * float(i))) * weights[i];
-        }
-    }
-    oColor = color;
+	vec2 texOffset = 1.0 / vec2(textureSize(material.texture0, 0)); // Gets size of single texel
+	vec4 color = texture(material.texture0, fragUV) * weights[0]; // Current fragment's contribution
+	if (horizontal) {
+		for (int i = 1; i < NUM_WEIGHTS; ++i) {
+			color += texture(material.texture0, fragUV + vec2(texOffset.x * float(i), 0.0)) * weights[i];
+			color += texture(material.texture0, fragUV - vec2(texOffset.x * float(i), 0.0)) * weights[i];
+		}
+	} else {
+		for (int i = 1; i < NUM_WEIGHTS; ++i) {
+			color += texture(material.texture0, fragUV + vec2(0.0, texOffset.y * float(i))) * weights[i];
+			color += texture(material.texture0, fragUV - vec2(0.0, texOffset.y * float(i))) * weights[i];
+		}
+	}
+	oColor = color;
 }

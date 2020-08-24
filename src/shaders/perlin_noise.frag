@@ -128,7 +128,8 @@ float _perlinNoise3D(vec3 p) {
 	// Output range or Perlin noise is [-sqrt(n)/2, sqrt(n)/2], where n is the number of dimensions
 	// https://www.gamedev.net/forums/topic/285533-2d-perlin-noise-gradient-noise-range--/#entry2794056
 	// Scale output to range [-1, 1]
-	return w_xyz * 1.15470053837925152901830; // * 2 / sqrt(3)
+	// * 1.15470053837925152901830; // * 2 / sqrt(3)
+	return w_xyz * 1.414213562373095048801689; // * sqrt(2) // That's how Ken Perlin does it
 }
 
 // Callable Perlin noise functions

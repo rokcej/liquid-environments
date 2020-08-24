@@ -1,6 +1,13 @@
 #version 300 es
 precision mediump float;
 
+struct FrustumLight {
+	vec3 position;
+	vec3 color;
+	mat4 matrix;
+	float farPlane;
+};
+
 
 #if (INSTANCED)
 //uniform mat4 VMat;
@@ -42,34 +49,43 @@ out vec2 fragUV;
 	out vec3 vViewPosition;
 #fi
 
+// out vec4 fragVPos4LS;
+// out vec4 fragVPos4LV;
 
+// //uniform mat4 uLSMat;
+// uniform mat4 uLPMat;
+// uniform mat4 uLVMat;
 
-out vec4 fragVPos4LS;
-out vec4 fragVPos4LV;
 
 uniform mat4 uMMat;
-//uniform mat4 uLSMat;
-uniform mat4 uLPMat;
-uniform mat4 uLVMat;
+uniform FrustumLight uFrustumLights[##NUM_FRUSTUM_LIGHTS];
+
+out vec4 vPosLS[##NUM_FRUSTUM_LIGHTS]; // Light space position
 
 void main() {
 	// Model view position
 	#if (!INSTANCED)
 	vec4 VPos4 = MVMat * vec4(VPos, 1.0);
-	vec4 VPos4LV = uLVMat * uMMat * vec4(VPos, 1.0);
-	vec4 VPos4LPV = uLPMat * VPos4LV;
+	vec4 VPos4World = uMMat * vec4(VPos, 1.0);
+	// vec4 VPos4LV = uLVMat * uMMat * vec4(VPos, 1.0);
+	// vec4 VPos4LPV = uLPMat * VPos4LV;
 	#fi
 	#if (INSTANCED)
 	vec4 VPos4 = MVMat * MMat * vec4(VPos, 1.0);
-	vec4 VPos4LV = uLVMat * uMMat * MMat * vec4(VPos, 1.0);
-	vec4 VPos4LPV = uLPMat * VPos4LV;
+	vec4 VPos4World = uMMat * MMat * vec4(VPos, 1.0);
+	// vec4 VPos4LV = uLVMat * uMMat * MMat * vec4(VPos, 1.0);
+	// vec4 VPos4LPV = uLPMat * VPos4LV;
 	#fi
+
+	#for I_LIGHT in 0 to NUM_FRUSTUM_LIGHTS
+		vPosLS[##I_LIGHT] = uFrustumLights[##I_LIGHT].matrix * VPos4World;
+	#end
 
 	// Projected position
 	gl_Position = PMat * VPos4;
 	fragVPos = vec3(VPos4) / VPos4.w;
-	fragVPos4LS = VPos4LPV;
-	fragVPos4LV = VPos4LV;
+	// fragVPos4LS = VPos4LPV;
+	// fragVPos4LV = VPos4LV;
 
 	// Transform normal
 	#if (!INSTANCED)

@@ -37,8 +37,11 @@ out vec4 oColor;
 uniform vec3 uCameraPos;
 uniform vec3 uLightPos;
 uniform vec3 uLightDir;
+uniform vec3 uLightColor;
 uniform float uLightDist; // Distance between light and camera
 uniform float uSeed;
+uniform float uBeta;
+uniform float uIntensity;
 in vec3 vPos;
 
 
@@ -60,7 +63,7 @@ void main() {
 	float depth = min(currentDepth, closestDepth);
 
 	// Light color
-	vec3 color = vec3(0.7, 0.84, 1.0);
+	vec3 color = uLightColor;
 	float alpha = 1.0;
 
 
@@ -77,8 +80,8 @@ void main() {
 	// Analytical approach //
 	/////////////////////////
 
-	float beta = 0.01; // Scattering coefficient
-	float intensity = 5000.0; // Light source radiant intensity
+	float beta = uBeta; // Scattering coefficient
+	float intensity = uIntensity; // Light source radiant intensity
 
 	vec3 viewDir = normalize(vPos - uCameraPos);
 	float cosGamma = max(dot(viewDir, -uLightDir), 0.0);

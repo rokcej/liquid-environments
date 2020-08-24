@@ -1,6 +1,13 @@
 #version 300 es
 precision mediump float;
 
+struct FrustumLight {
+	vec3 position;
+	vec3 color;
+	mat4 matrix;
+	float farPlane;
+};
+
 struct Light {
 	bool directional;
 	vec3 position;
@@ -115,10 +122,13 @@ in vec3 fragVPos;
 	in vec3 vViewPosition;
 #fi
 
-uniform float uFarPlane;
+// uniform float uFarPlane;
 
-in vec4 fragVPos4LS;
-in vec4 fragVPos4LV;
+// in vec4 fragVPos4LS;
+// in vec4 fragVPos4LV;
+
+uniform FrustumLight uFrustumLights[##NUM_FRUSTUM_LIGHTS];
+in vec4 vPosLS[##NUM_FRUSTUM_LIGHTS]; // Light space position
 
 out vec4 oColor[3];
 
@@ -147,6 +157,49 @@ vec3 calcPointLight (Light light, vec3 normal, vec3 viewDir) {
 	// Attenuation
 	return (diffuse + specular);
 }
+
+
+vec3 calcFrustumLight(int index, sampler2D tex, vec3 normal, vec3 viewDir) {
+	vec3 posLS = (vPosLS[index].xyz / vPosLS[index].w) * 0.5 + 0.5;
+	if (posLS.x > 0.0 && posLS.x < 1.0 && posLS.y > 0.0 && posLS.y < 1.0 && posLS.z < 1.0) {
+		vec3 lightDir = uFrustumLights[index].position - fragVPos;
+		float lightCurrentDepth = length(lightDir);
+		if (lightCurrentDepth > 0.0)
+			lightDir /= lightCurrentDepth;
+		// TODO fix bias
+		float bias = max(0.2 * (1.0 - dot(normal, lightDir)), 0.05);
+
+		vec2 texelSize = 1.0 / vec2(textureSize(tex, 0));
+
+		float shadow = 0.0;
+		for (int x = -1; x <= 1; ++x) {
+			for (int y = -1; y <= 1; ++y) {
+				float pcfDepth = texture(tex, posLS.xy + vec2(x, y) * texelSize).r * uFrustumLights[index].farPlane; 
+				shadow += lightCurrentDepth - bias > pcfDepth ? 1.0 : 0.0;        
+			}    
+		}
+		shadow /= 9.0;
+
+		// // http://www.opengl-tutorial.org/intermediate-tutorials/tutorial-16-shadow-mapping/#poisson-sampling
+		// for (int i = 0; i < 9; ++i) {
+		// 	int idx = int(rand(fragVPos) * 47.999);
+		// 	float poissonDepth = texture(tex, posLS.xy + (poissonDisk[idx] - vec2(0.5)) * texelSize * 2.0).r * uFarPlane; 
+		// 	shadow += lightCurrentDepth - bias > poissonDepth ? 1.0 : 0.0;  
+		// }
+		// shadow /= 9.0;
+
+		// Soft shadow edge
+		float threshold = 0.15;
+		float edgeDist = min(min(posLS.x, 1.0 - posLS.x), min(posLS.y, 1.0 - posLS.y));
+		float atten = 1.0 - smoothstep(0.0, threshold, edgeDist);
+		shadow = min(shadow + atten, 1.0); 
+
+		return (1.0 - shadow) * calcPointLight(Light(false, uFrustumLights[index].position, uFrustumLights[index].color), normal, viewDir);
+	} else {
+		return vec3(0.0);
+	}
+}
+
 
 vec3 calcDirectLight (Light light, vec3 normal, vec3 viewDir) {
 	vec3 lightDir = normalize(light.position);
@@ -189,50 +242,54 @@ void main() {
 	// Calculate combined light contribution
 	vec3 combined = ambient;
 
-	float shadow = 0.0;
-	#if (TEXTURE)
-	vec3 posLS = (fragVPos4LS.xyz / fragVPos4LS.w) * 0.5 + 0.5;
-	if (posLS.x > 0.0 && posLS.x < 1.0 && posLS.y > 0.0 && posLS.y < 1.0 && posLS.z < 1.0) {
-		//float lightClosestDepth = texture(material.texture0, posLS.xy).r;
-		//float lightCurrentDepth = posLS.z;
-		float lightCurrentDepth = length(fragVPos4LV.xyz / fragVPos4LV.w);
+	// float shadow = 0.0;
+	// #if (TEXTURE)
+	// vec3 posLS = (fragVPos4LS.xyz / fragVPos4LS.w) * 0.5 + 0.5;
+	// if (posLS.x > 0.0 && posLS.x < 1.0 && posLS.y > 0.0 && posLS.y < 1.0 && posLS.z < 1.0) {
+	// 	//float lightClosestDepth = texture(material.texture0, posLS.xy).r;
+	// 	//float lightCurrentDepth = posLS.z;
+	// 	float lightCurrentDepth = length(fragVPos4LV.xyz / fragVPos4LV.w);
+	// 	lightCurrentDepth = length(fragVPos - uFrustumLights[0].position);
 
-		// TODO fix bias
-		//float bias = 0.05;
-		vec3 lightDir = normalize(lights[0].position - fragVPos);
-		float bias = max(0.2 * (1.0 - dot(normal, lightDir)), 0.05);
-		//shadow = lightCurrentDepth - bias > lightClosestDepth ? 1.0 : 0.0;
+	// 	// TODO fix bias
+	// 	//float bias = 0.05;
+	// 	vec3 lightDir = normalize(lights[0].position - fragVPos);
+	// 	float bias = max(0.2 * (1.0 - dot(normal, lightDir)), 0.05);
+	// 	//shadow = lightCurrentDepth - bias > lightClosestDepth ? 1.0 : 0.0;
 
 
-		vec2 texelSize = 1.0 / vec2(textureSize(material.texture0, 0));
+	// 	vec2 texelSize = 1.0 / vec2(textureSize(material.texture0, 0));
 
-		// for (int x = -1; x <= 1; ++x) {
-		// 	for (int y = -1; y <= 1; ++y) {
-		// 		float pcfDepth = texture(material.texture0, posLS.xy + vec2(x, y) * texelSize).r * uFarPlane; 
-		// 		shadow += lightCurrentDepth - bias > pcfDepth ? 1.0 : 0.0;        
-		// 	}    
-		// }
+	// 	for (int x = -1; x <= 1; ++x) {
+	// 		for (int y = -1; y <= 1; ++y) {
+	// 			float pcfDepth = texture(material.texture0, posLS.xy + vec2(x, y) * texelSize).r * uFarPlane; 
+	// 			shadow += lightCurrentDepth - bias > pcfDepth ? 1.0 : 0.0;        
+	// 		}    
+	// 	}
+	// 	shadow /= 9.0;
 
-		// http://www.opengl-tutorial.org/intermediate-tutorials/tutorial-16-shadow-mapping/#poisson-sampling
-		for (int i = 0; i < 9; ++i) {
-			int idx = int(rand(fragVPos) * 47.999);
-			float poissonDepth = texture(material.texture0, posLS.xy + (poissonDisk[idx] - vec2(0.5)) * texelSize * 2.0).r * uFarPlane; 
-			shadow += lightCurrentDepth - bias > poissonDepth ? 1.0 : 0.0;  
-		}
-		shadow /= 9.0;
+	// 	// // http://www.opengl-tutorial.org/intermediate-tutorials/tutorial-16-shadow-mapping/#poisson-sampling
+	// 	// for (int i = 0; i < 9; ++i) {
+	// 	// 	int idx = int(rand(fragVPos) * 47.999);
+	// 	// 	float poissonDepth = texture(material.texture0, posLS.xy + (poissonDisk[idx] - vec2(0.5)) * texelSize * 2.0).r * uFarPlane; 
+	// 	// 	shadow += lightCurrentDepth - bias > poissonDepth ? 1.0 : 0.0;  
+	// 	// }
+	// 	// shadow /= 9.0;
 
-	}
+	// }
 	
-	#fi
+	// #fi
+
+	#for I_LIGHT in 0 to NUM_FRUSTUM_LIGHTS
+		combined += calcFrustumLight(##I_LIGHT, material.texture##I_LIGHT, normal, viewDir);
+	#end
 
 	#if (!NO_LIGHTS)
 		#for lightIdx in 0 to NUM_LIGHTS
-			if (!lights[##lightIdx].directional) {
-				combined += (1.0 - shadow) * calcPointLight(lights[##lightIdx], normal, viewDir);
-			}
-			else {
-				combined += (1.0 - shadow) * calcDirectLight(lights[##lightIdx], normal, viewDir);
-			}
+			if (!lights[##lightIdx].directional)
+				combined += calcPointLight(lights[##lightIdx], normal, viewDir);
+			else
+				combined += calcDirectLight(lights[##lightIdx], normal, viewDir);
 		#end
 	#fi
 

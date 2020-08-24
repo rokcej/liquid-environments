@@ -103,5 +103,12 @@
 			"vertex": "lights/airlight_lookup.vert",
 			"fragment": "lights/airlight_lookup.frag"
 		}
+	},
+	"custom_light_volume_blend": {
+		"description": "Blend light volume passes.",
+		"shaders": {
+			"vertex": "texture.vert",
+			"fragment": "lights/light_volume_blend.frag"
+		}
 	}
 }
