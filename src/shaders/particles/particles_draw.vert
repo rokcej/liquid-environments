@@ -46,6 +46,10 @@ uniform float uIntensity;
 
 uniform vec3 uLiquidColor;
 uniform vec3 uLiquidAtten;
+uniform vec3 uLightAtten;
+uniform vec2 uFogRange;
+uniform vec2 uFogStrength;
+uniform float uCameraHeight;
 
 uniform float f; // Focal length
 uniform float a; // Aperture radius
@@ -54,13 +58,54 @@ uniform float v0; // Distance in focus
 // Output transformed vertex position
 out vec4 vColor;
 out vec3 vPos;
+out vec3 vFogCoeff;
 out float vProjSize;
 out float vDepthDist;
 
 
+vec3 calcFog(float depth, float height) {
+	float y0 = min(uCameraHeight, height);
+	float y1 = max(uCameraHeight, height);
+	float yMin = uFogRange.x;
+	float yMax = uFogRange.y;
+	float x0 = uFogStrength.x;
+	float x1 = uFogStrength.y;
+
+	float F = 0.0; // Integral sum
+	if (y1 - y0 < 0.000001) {
+		if (y0 < yMin)
+			F = x0;
+		else if (y0 > yMax)
+			F = x1;
+		else
+			F = (y0 - yMin) / (yMax - yMin) * (x1 - x0) + x0;
+	} else {
+		float a, b; // Integration borders
+		if (y0 < yMin) {
+			a = y0;
+			b = min(y1, yMin);
+			F += x0 * (b - a);
+		}
+		if (y0 < yMax && y1 > yMin) {
+			a = max(y0, yMin);
+			b = min(y1, yMax);
+			F += x0 * (b - a) + (x1 - x0) / (yMax - yMin) * (0.5 * (b * b - a * a) - yMin * (b - a));
+		}
+		if (y1 > yMax) {
+			a = max(y0, yMax);
+			b = y1;
+			F += x1 * (b - a);
+		}
+		F /= (y1 - y0);
+	}
+	F *= depth;
+
+	return uLiquidAtten * F;
+}
+
 vec3 calcLightAtten(float dist) {
     // Attenuation
-    float attenuation = 1.0f / (1.0f + 0.01f * dist + 0.0001f * (dist * dist));
+    float attenuation = 1.0f / (uLightAtten.x + uLightAtten.y * dist + uLightAtten.z * (dist * dist));
     // Transmittance
     vec3 transmittance = exp(-uLiquidAtten * dist);
     return attenuation * transmittance;
@@ -122,6 +167,9 @@ void main() {
     vec4 projSize4 = PMat * vec4(pointSize, 0.0, eyePos.zw);
     vProjSize = projSize4.x / projSize4.w;
 
+	// Fog
+	vFogCoeff = calcFog(vDepthDist, pos.y);
+
     // Opacity
     float opacity = vProjSize >= 1.0 ? 1.0 : vProjSize * vProjSize;
     float fadeTime = 1.0;
@@ -145,7 +193,6 @@ void main() {
 	#end
 
     vec3 color = uIntensity * illum * material.diffuse;
-
 
     vColor = vec4(color, opacity * alpha);
     gl_PointSize = vProjSize;

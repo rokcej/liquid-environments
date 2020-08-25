@@ -61,9 +61,29 @@ class App {
 				this.dof.focus.y = this.canvas.height - 1 - y;
 			}
 		});
+		// Liquid
+		this.fog = {
+			color: new RC.Color(0.0, 0.18, 0.4),
+			atten: new RC.Vector3(0.07, 0.06, 0.05),
+			range: new RC.Vector2(-4, 6),
+			strength: new RC.Vector2(2, 0.5),
+			lightAtten: new RC.Vector3(1.0, 0.01, 0.0001)
+		}
+		this.fog.color.multiplyScalar(0.5); // (0, 0.3, 0.7)
+		this.fog.atten.multiplyScalar(1.8);
+
+		// Noise
+		this.noise = {
+			scale: 2.5,
+			contrast: 1.0,
+			speed: 0.8,
+			octaves: 2,
+			persistence: 0.5,
+			lacunarity: 2.0
+		}
 		// Lights
 		this.lights = {
-			shadowRes: 512,
+			shadowRes: 1024,
 			lookupRes: 256,
 			frustum: [],
 			point: []
@@ -72,7 +92,7 @@ class App {
 		this.particles = {
 			res: 1024,
 			opacity: 1,
-			intensity: 2,
+			intensity: 1.5,
 			size: 12,
 			components: 3, // Number of texels per particle
 			scene: new RC.Scene()
@@ -136,9 +156,7 @@ class App {
 		this.particles.mesh.renderingPrimitive = RC.POINTS;
 		this.particles.mesh.frustumCulled = false;
 
-		//this.scene.add(this.particles.mesh);
 		this.particles.scene.add(this.particles.mesh);
-
 	}
 
 	initLightVolumes() {
@@ -203,7 +221,7 @@ class App {
 		let l = {
 			intensity: 1.0,
 			beta: 0.01,
-			volumeIntensity: 5000.0,
+			volumeIntensity: 2.0,
 			color: color,
 			camera: new RC.PerspectiveCamera(90, 1.0, 0.1, 500.0),
 			texture: new RC.Texture(
@@ -215,7 +233,6 @@ class App {
 		l.camera.lookAt(target, new RC.Vector3(0.0, 1.0, 0.0));
 		l.camera.updateMatrixWorld();
 		l.camera.matrixWorldInverse.getInverse(l.camera.matrixWorld);
-		//l.lightSpaceMat.multiplyMatrices(l.camera.projectionMatrix, l.camera.matrixWorldInverse);
 		
 		l.PMatInv = new RC.Matrix4().getInverse(l.camera.projectionMatrix);
 
@@ -242,8 +259,9 @@ class App {
 		if (shininess === undefined) shininess = 1.0;
 
 		let mat = new RC.CustomShaderMaterial("phong_liquid", {
-			"uLiquidColor": this.liquidColor.toArray(),
-			"uLiquidAtten": this.liquidAtten.toArray()
+			"uLiquidColor": this.fog.color.toArray(),
+			"uLiquidAtten": this.fog.atten.toArray(),
+			"uLightAtten": this.fog.lightAtten.toArray()
 		});
 		mat.color = color;
 		mat.specular = specular;
@@ -265,25 +283,21 @@ class App {
 		this.cameraManager.activeCamera = this.camera;
 
 
-		// Liquid color
-		this.liquidColor = new RC.Color(0.0, 0.18, 0.4); // (0, 0.3, 0.7);
-		this.liquidColor.multiplyScalar(0.5);
-		this.liquidAtten = new RC.Vector3(0.07, 0.06, 0.05);
-		this.liquidAtten.multiplyScalar(1.8);
-
-
 		// Volumetric lights
-		this.addFrustumLight(new RC.Vector3(-4, 10, -20), new RC.Vector3(0, 0, 0), new RC.Color(0.8, 0.8, 0.2)).intensity = 0.7;
-		this.addFrustumLight(new RC.Vector3(10, 10, 10),  new RC.Vector3(0, 0, 0), new RC.Color(1.0, 0.2, 0.5)).intensity = 0.9;
-		this.addFrustumLight(new RC.Vector3(20, 40, -8),  new RC.Vector3(0, 0, 0), new RC.Color(0.9, 0.85, 1.0)).intensity = 1.8;
-		this.lights.frustum[2].volumeIntensity = 8000.0
+		//this.addFrustumLight(new RC.Vector3(-4, 10, -20), new RC.Vector3(0, 0, 0), new RC.Color(0.8, 0.8, 0.2)).intensity = 0.7;
+		//this.addFrustumLight(new RC.Vector3(10, 10, 10),  new RC.Vector3(0, 0, 0), new RC.Color(1.0, 0.2, 0.5)).intensity = 0.9;
+		//this.addFrustumLight(new RC.Vector3(20, 40, -8),  new RC.Vector3(0, 0, 0), new RC.Color(0.9, 0.85, 1.0)).intensity = 1.8;
+		//this.lights.frustum[2].volumeIntensity = 8000.0
 
+		//this.addFrustumLight(new RC.Vector3(10, 10, 10),  new RC.Vector3(0, 0, 0), new RC.Color(1, 1, 1)).intensity = 0;
+		this.addFrustumLight(new RC.Vector3(-4, 10, -20), new RC.Vector3(0, 0, 0), new RC.Color(1, 1, 1)); //.volumeIntensity = 0;
+		this.addFrustumLight(new RC.Vector3(10, 10, 10),  new RC.Vector3(0, 0, 0), new RC.Color(1, 1, 1)); //.volumeIntensity = 0;
 
 		// RenderCore Lights
 		// this.dLight = new RC.DirectionalLight(new RC.Color("#FFFFFF"), 1.0);
 		// this.dLight.position = new RC.Vector3(1.0, 0.5, 0.8);
-		// this.pLight = new RC.PointLight(new RC.Color("#FFFFFF"), 1.0);
-		// this.pLight.position = new RC.Vector3(-4.0, 10.0, -20.0);
+		this.pLight = new RC.PointLight(new RC.Color("#FFFFFF"), 1.0);
+		this.pLight.position = new RC.Vector3(-4.0, 10.0, -20.0);
 		this.pLight2 = new RC.PointLight(new RC.Color("#FFFFFF"), 1.0);
 		this.pLight2.position = new RC.Vector3(10.0, 10.0, 10.0);
 		this.aLight = new RC.AmbientLight(new RC.Color("#FFFFFF"), 0.03);
@@ -362,12 +376,12 @@ class App {
 				let mat = new RC.CustomShaderMaterial("perlin_noise", {
 					"uRes": [this.canvas.width, this.canvas.height],
 					"uTime": this.timer.curr,
-					"uScale": this.canvas.height / 2.0,
-					"uContrast": 1.0,
-					"uSpeed": 0.5,
-					"uOctaves": 2,
-					"uPersistence": 0.5,
-					"uLacunarity": 2.0
+					"uScale": this.canvas.height / this.noise.scale,
+					"uContrast": this.noise.contrast,
+					"uSpeed": this.noise.speed,
+					"uOctaves": this.noise.octaves,
+					"uPersistence": this.noise.persistence,
+					"uLacunarity": this.noise.lacunarity
 				});
 				mat.ligths = false;
 				return { material: mat, textures: [] };
@@ -418,7 +432,6 @@ class App {
 			(textureMap, additionalData) => {
 				this.particles.mesh.material.addMap(textureMap.mainDepthDist);
 				this.particles.mesh.material.addMap(textureMap.perlinNoise);
-				this.particles.mesh.material.addMap(textureMap.perlinNoise2);
 				// Shadow maps
 				for (let l of this.lights.frustum)
 					this.particles.mesh.material.addMap(l.texture);
@@ -431,8 +444,12 @@ class App {
 
 				this.particles.mesh.material.setUniform("uRes", [this.canvas.width, this.canvas.height]);
 				this.particles.mesh.material.setUniform("uCameraRange", [this.camera.near, this.camera.far]);
-				this.particles.mesh.material.setUniform("uLiquidColor", this.liquidColor.toArray());
-				this.particles.mesh.material.setUniform("uLiquidAtten", this.liquidAtten.toArray());
+				this.particles.mesh.material.setUniform("uLiquidColor", this.fog.color.toArray());
+				this.particles.mesh.material.setUniform("uLiquidAtten", this.fog.atten.toArray());
+				this.particles.mesh.material.setUniform("uLightAtten", this.fog.lightAtten.toArray());
+				this.particles.mesh.material.setUniform("uFogRange", this.fog.range.toArray());
+				this.particles.mesh.material.setUniform("uFogStrength", this.fog.strength.toArray());
+				this.particles.mesh.material.setUniform("uCameraHeight", this.camera.position.y);
 				
 				this.particles.mesh.material.setUniform("f", this.dof.f);
 				this.particles.mesh.material.setUniform("a", this.dof.a);
@@ -765,8 +782,11 @@ class App {
 			(textureMap, additionalData) => {},
 			(textureMap, additionalData) => {
 				let mat = new RC.CustomShaderMaterial("water", {
-					"uLiquidColor": this.liquidColor.toArray(),
-					"uLiquidAtten": this.liquidAtten.toArray(),
+					"uLiquidColor": this.fog.color.toArray(),
+					"uLiquidAtten": this.fog.atten.toArray(),
+					"uFogRange": this.fog.range.toArray(),
+					"uFogStrength": this.fog.strength.toArray(),
+					"uCameraHeight": this.camera.position.y
 				});
 				mat.ligths = false;
 				return { 
@@ -794,6 +814,7 @@ class App {
 			(textureMap, additionalData) => {},
 			(textureMap, additionalData) => {
 				let mat = new RC.CustomShaderMaterial("post", {});
+				mat.addSBFlag("RGB_SHIFT");
 				mat.ligths = false;
 				return { 
 					material: mat,
@@ -850,11 +871,22 @@ class App {
 
 		this.objLoader.load("/data/models/bunny.obj", (obj) => {
 			this.objects = obj;
+
+			let xorshift32_state = new Uint32Array([0.4 * 0xFFFFFFFF]);
+			function xorshift32() {
+				const x = xorshift32_state;
+				x[0] ^= x[0] << 13;
+				x[0] ^= x[0] >> 17;
+				x[0] ^= x[0] << 5;
+				return x[0] / 0xFFFFFFFF;
+			}
+
 			for (let i = 0; i < obj.length; i++) {
 				//obj[i].position.z = 0;
 
 				// Main bunny
-				obj[i].position = new RC.Vector3(-4, 9, -19);
+				//obj[i].position = new RC.Vector3(-4, 9, -19);
+				obj[i].position = new RC.Vector3(0, 0, 0);
 				obj[i].material = this.createPhongMat();
 				obj[i].material.shininess = 16;
 
@@ -870,9 +902,9 @@ class App {
 				for (let x = -(countX-1) * space / 2; x <= (countX-1) * space / 2; x += space) {
 					for (let z = 0; z >= -(countZ-1) * space; z -= space) {
 						let clone = new RC.Mesh(obj[i].geometry, this.createPhongMat());
-						clone.position = new RC.Vector3(x, Math.random() * 8 - 4, z - 2);
+						clone.position = new RC.Vector3(x, xorshift32() * 8 - 4, z - 2);
 
-						const colorCode = colors[Math.floor(Math.random() * colors.length)];
+						const colorCode = colors[Math.floor(xorshift32() * colors.length)];
 						clone.material.color = new RC.Color(colorCode);
 						clone.material.specular = new RC.Color("#444444");
 						clone.material.shininess = 8;

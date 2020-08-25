@@ -98,6 +98,7 @@ float alpha = 1.0;
 #fi
 
 uniform vec3 uLiquidAtten;
+uniform vec3 uLightAtten;
 
 // From vertex shader
 in vec3 fragVNorm;
@@ -145,7 +146,7 @@ vec3 calcPointLight (Light light, vec3 normal, vec3 viewDir) {
 
 	// Attenuation
 	float dist = length(light.position - fragVPos);
-	float attenuation = 1.0f / (1.0f + 0.01f * dist + 0.0001f * (dist * dist));
+	float attenuation = 1.0f / (uLightAtten.x + uLightAtten.y * dist + uLightAtten.z * (dist * dist));
 
 	// Transmittance
 	vec3 transmittance = exp(-uLiquidAtten * dist);
@@ -166,15 +167,19 @@ vec3 calcFrustumLight(int index, sampler2D tex, vec3 normal, vec3 viewDir) {
 		float lightCurrentDepth = length(lightDir);
 		if (lightCurrentDepth > 0.0)
 			lightDir /= lightCurrentDepth;
-		// TODO fix bias
-		float bias = max(0.2 * (1.0 - dot(normal, lightDir)), 0.05);
+
+		// Shadow bias
+		float cosTheta = abs(dot(normal, lightDir));
+		float tanTheta = sqrt(1.0 - cosTheta * cosTheta) / cosTheta; // tan = sin / cos
+		float bias = 0.0038 * lightCurrentDepth * tanTheta; // 0.05
 
 		vec2 texelSize = 1.0 / vec2(textureSize(tex, 0));
-
 		float shadow = 0.0;
+
+		vec2 jitter = (rand(fragVPos) - 0.5) * texelSize;
 		for (int x = -1; x <= 1; ++x) {
 			for (int y = -1; y <= 1; ++y) {
-				float pcfDepth = texture(tex, posLS.xy + vec2(x, y) * texelSize).r * uFrustumLights[index].farPlane; 
+				float pcfDepth = texture(tex, posLS.xy + jitter + vec2(x, y) * texelSize).r * uFrustumLights[index].farPlane; 
 				shadow += lightCurrentDepth - bias > pcfDepth ? 1.0 : 0.0;        
 			}    
 		}
@@ -183,7 +188,7 @@ vec3 calcFrustumLight(int index, sampler2D tex, vec3 normal, vec3 viewDir) {
 		// // http://www.opengl-tutorial.org/intermediate-tutorials/tutorial-16-shadow-mapping/#poisson-sampling
 		// for (int i = 0; i < 9; ++i) {
 		// 	int idx = int(rand(fragVPos) * 47.999);
-		// 	float poissonDepth = texture(tex, posLS.xy + (poissonDisk[idx] - vec2(0.5)) * texelSize * 2.0).r * uFarPlane; 
+		// 	float poissonDepth = texture(tex, posLS.xy + (poissonDisk[idx] - vec2(0.5)) * texelSize * 2.0).r * uFrustumLights[index].farPlane; 
 		// 	shadow += lightCurrentDepth - bias > poissonDepth ? 1.0 : 0.0;  
 		// }
 		// shadow /= 9.0;

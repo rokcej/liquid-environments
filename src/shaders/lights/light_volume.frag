@@ -81,7 +81,7 @@ void main() {
 	/////////////////////////
 
 	float beta = uBeta; // Scattering coefficient
-	float intensity = uIntensity; // Light source radiant intensity
+	float intensity = uIntensity * 1000.0; // Light source radiant intensity
 
 	vec3 viewDir = normalize(vPos - uCameraPos);
 	float cosGamma = max(dot(viewDir, -uLightDir), 0.0);

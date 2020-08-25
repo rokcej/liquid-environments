@@ -26,19 +26,17 @@ uniform Material material;
 uniform vec2 uRes; // Viewport resolution
 uniform vec2 uCameraRange; // Camera near & far values
 
-uniform vec3 uLiquidColor;
-uniform vec3 uLiquidAtten;
-
 in vec4 vColor;
 in vec3 vPos;
+in vec3 vFogCoeff;
 in float vProjSize;
 in float vDepthDist;
 
 out vec4 oColor;
 
-vec3 applyFog(vec3 color, float depth, float noise) {
+vec3 applyFog(vec3 color, vec3 fogCoeff, float noise) {
 	// Beer's law
-	vec3 transmittance = exp(-uLiquidAtten * depth * noise);
+	vec3 transmittance = exp(-fogCoeff * noise);
 
 	return color * transmittance; // + uLiquidColor * (1.0 - transmittance.b);
 }
@@ -75,8 +73,10 @@ void main() {
 
 	// Perlin noise
 	float noise = texture(material.texture2, uv).r;
-	float noise_2 = texture(material.texture3, uv).r * 0.5 + 0.25;
 	
+	// Fog
+	vec3 color = applyFog(vColor.rgb, vFogCoeff, noise);
+
 	// Color
-	oColor = vec4(applyFog(vColor.rgb, currentDepth, noise), opacity);
+	oColor = vec4(color, opacity);
 }

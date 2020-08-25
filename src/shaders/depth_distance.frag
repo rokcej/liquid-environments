@@ -32,5 +32,7 @@ void main() {
 	vec3 fragDir = normalize(vFragDir);
 	float depth = depthLinear / dot(fragDir, uCameraDir);
 
-	oColor = vec4(vec3(depth), 1.0);
+	float height = fragDir.y * depth + uCameraPos.y;
+
+	oColor = vec4(depth, height, 0.0, 1.0);
 }

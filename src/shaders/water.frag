@@ -11,23 +11,54 @@ uniform Material material;
 
 uniform vec3 uLiquidColor;
 uniform vec3 uLiquidAtten;
+uniform vec2 uFogRange;
+uniform vec2 uFogStrength;
+uniform float uCameraHeight;
 
 in vec2 fragUV;
 
 
 out vec4 oColor;
 
-vec3 applyFog(vec3 color, float depth, float noise) {
-	/*vec3 fragPos = depth * fragDir + uCameraPos;
-	float y0 = max(min(uCameraPos.y, 6.0), -4.0);
-	float y1 = max(min(fragPos.y, 6.0), -4.0);
-	float integral = 6.0 * y1 - y1 * y1 * 0.5 - 6.0 * y0 + y0 * y0 * 0.5;
-	float F = depth / (fragPos.y - uCameraPos.y) * 0.02 * integral;
-	float fog = exp(-F);
-	return colorBuf * fog + vec3(1.0) * (1.0 - fog);*/
+vec3 applyFog(vec3 color, float depth, float height, float noise) {
+	float y0 = min(uCameraHeight, height);
+	float y1 = max(uCameraHeight, height);
+	float yMin = uFogRange.x;
+	float yMax = uFogRange.y;
+	float x0 = uFogStrength.x;
+	float x1 = uFogStrength.y;
+
+	float F = 0.0; // Integral sum
+	if (y1 - y0 < 0.000001) {
+		if (y0 < yMin)
+			F = x0;
+		else if (y0 > yMax)
+			F = x1;
+		else
+			F = (y0 - yMin) / (yMax - yMin) * (x1 - x0) + x0;
+	} else {
+		float a, b; // Integration borders
+		if (y0 < yMin) {
+			a = y0;
+			b = min(y1, yMin);
+			F += x0 * (b - a);
+		}
+		if (y0 < yMax && y1 > yMin) {
+			a = max(y0, yMin);
+			b = min(y1, yMax);
+			F += x0 * (b - a) + (x1 - x0) / (yMax - yMin) * (0.5 * (b * b - a * a) - yMin * (b - a));
+		}
+		if (y1 > yMax) {
+			a = max(y0, yMax);
+			b = y1;
+			F += x1 * (b - a);
+		}
+		F /= (y1 - y0);
+	}
+	F *= depth;
 
 	// Beer's law
-	vec3 transmittance = exp(-uLiquidAtten * depth * noise);
+	vec3 transmittance = exp(-uLiquidAtten * F * noise);
 	color *= transmittance;
 
 	// Mix with background color
@@ -38,9 +69,12 @@ vec3 applyFog(vec3 color, float depth, float noise) {
 
 void main() {
 	vec3 mainColor = texture(material.texture0, fragUV).rgb;
-	float mainDepth = texture(material.texture1, fragUV).r;
-	float noise = texture(material.texture3, fragUV).r;
-	mainColor = applyFog(mainColor, mainDepth, noise);
+
+	vec2 mainDepthDist = texture(material.texture1, fragUV).rg;
+	float depth = mainDepthDist.r;
+	float height = mainDepthDist.g;
+	float noise = texture(material.texture3, fragUV).r * 0.9 + 0.1;
+	mainColor = applyFog(mainColor, depth, height, noise);
 
 	//vec3 particleColor = texture(material.texture2, fragUV).rgb;
 	//float particleAlpha = texture(material.texture2, fragUV).a;
