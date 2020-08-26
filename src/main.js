@@ -324,7 +324,7 @@ class App {
 			RC.Texture.RGBA, RC.Texture.RGBA, RC.Texture.UNSIGNED_BYTE, 1, 1);
 
 		plane.translateY(-4);
-		plane.rotateX(Math.PI * 0.5);
+		plane.rotateX(-Math.PI * 0.5);
 
 		//plane.material.addMap(texture);
 		this.scene.add(plane);
@@ -500,6 +500,8 @@ class App {
 					
 					if (object.material.programName === "custom_phong_liquid") {                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
 						object.material.setUniform("uMMat", object.matrix.toArray());
+						object.material.setUniform("uFogRange", this.fog.range.toArray());
+						object.material.setUniform("uFogStrength", this.fog.strength.toArray());
 					}
 				}
 
@@ -521,6 +523,7 @@ class App {
 							object.material.setUniform(prefix + "farPlane", light.camera.far);
 							object.material.setUniform(prefix + "color", lightColor.toArray());
 							object.material.setUniform(prefix + "position", lightPos.toArray());
+							object.material.setUniform(prefix + "worldHeight", light.camera.position.y);
 						}
 					}
 
@@ -529,6 +532,7 @@ class App {
 					this.particles.mesh.material.setUniform(prefix + "farPlane", light.camera.far);
 					this.particles.mesh.material.setUniform(prefix + "color", lightColor.toArray());
 					this.particles.mesh.material.setUniform(prefix + "position", lightPos.toArray());
+					this.particles.mesh.material.setUniform(prefix + "worldHeight", light.camera.position.y);
 				}
 
 				// for (let l of this.lights)

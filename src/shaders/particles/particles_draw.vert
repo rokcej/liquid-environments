@@ -6,6 +6,7 @@ struct FrustumLight {
 	vec3 color;
 	mat4 matrix;
 	float farPlane;
+	float worldHeight;
 };
 
 struct Light {
@@ -63,9 +64,9 @@ out float vProjSize;
 out float vDepthDist;
 
 
-vec3 calcFog(float depth, float height) {
-	float y0 = min(uCameraHeight, height);
-	float y1 = max(uCameraHeight, height);
+vec3 calcFog(float depth, float height0, float height1) {
+	float y0 = min(height0, height1);
+	float y1 = max(height0, height1);
 	float yMin = uFogRange.x;
 	float yMax = uFogRange.y;
 	float x0 = uFogStrength.x;
@@ -103,18 +104,17 @@ vec3 calcFog(float depth, float height) {
 	return uLiquidAtten * F;
 }
 
-vec3 calcLightAtten(float dist) {
+float calcLightAtten(float dist) {
     // Attenuation
-    float attenuation = 1.0f / (uLightAtten.x + uLightAtten.y * dist + uLightAtten.z * (dist * dist));
-    // Transmittance
-    vec3 transmittance = exp(-uLiquidAtten * dist);
-    return attenuation * transmittance;
+    return 1.0f / (uLightAtten.x + uLightAtten.y * dist + uLightAtten.z * (dist * dist));
 }
 
 vec3 calcLight(Light light) {
 	if (!light.directional) { // Point light
 		float dist = length(light.position - vPos);
-		return light.color * calcLightAtten(dist);
+		// Transmittance
+		vec3 transmittance = exp(-uLiquidAtten * dist);
+		return light.color * calcLightAtten(dist) * transmittance;
 	} else { // Directional light
 		vec3 lightDir = normalize(light.position);
 		return light.color;
@@ -141,7 +141,11 @@ vec3 calcFrustumLight(int index, sampler2D tex, vec3 posWorld) {
 		float atten = 1.0 - smoothstep(0.0, threshold, edgeDist);
 		shadow = min(shadow + atten, 1.0); 
 
-		return (1.0 - shadow) * uFrustumLights[index].color * calcLightAtten(lightCurrentDepth);
+		// Transmittance
+		vec3 fogCoeff = calcFog(lightCurrentDepth, posWorld.y, uFrustumLights[index].worldHeight);
+		vec3 transmittance = exp(-fogCoeff);
+
+		return (1.0 - shadow) * uFrustumLights[index].color * calcLightAtten(lightCurrentDepth) * transmittance;
 	}
 	return vec3(0.0);
 }
@@ -168,7 +172,7 @@ void main() {
     vProjSize = projSize4.x / projSize4.w;
 
 	// Fog
-	vFogCoeff = calcFog(vDepthDist, pos.y);
+	vFogCoeff = calcFog(vDepthDist, pos.y, uCameraHeight);
 
     // Opacity
     float opacity = vProjSize >= 1.0 ? 1.0 : vProjSize * vProjSize;
@@ -177,7 +181,7 @@ void main() {
 
     // Pseudo-DOF
     float coc = a * abs(f / (v0 - f)) * abs(v0 / vDepthDist - 1.0);
-	opacity /= 1.0 + coc * 0.5;
+	opacity /= 1.0 + coc * 0.4;
 
     // RenderCore Lights
 	vec3 illum = ambient;

@@ -6,6 +6,7 @@ struct FrustumLight {
 	vec3 color;
 	mat4 matrix;
 	float farPlane;
+	float worldHeight;
 };
 
 
@@ -36,6 +37,7 @@ in vec3 VNorm;      // Vertex normal
 
 // Output transformed vertex position, normal and texture coordinate
 out vec3 fragVPos;
+out vec3 fragVPosWorld;
 out vec3 fragVNorm;
 #if (TEXTURE)
 out vec2 fragUV;
@@ -84,6 +86,7 @@ void main() {
 	// Projected position
 	gl_Position = PMat * VPos4;
 	fragVPos = vec3(VPos4) / VPos4.w;
+	fragVPosWorld = VPos4World.xyz / VPos4World.w;
 	// fragVPos4LS = VPos4LPV;
 	// fragVPos4LV = VPos4LV;
 

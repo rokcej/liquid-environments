@@ -6,6 +6,7 @@ struct FrustumLight {
 	vec3 color;
 	mat4 matrix;
 	float farPlane;
+	float worldHeight;
 };
 
 struct Light {
@@ -99,10 +100,13 @@ float alpha = 1.0;
 
 uniform vec3 uLiquidAtten;
 uniform vec3 uLightAtten;
+uniform vec2 uFogRange;
+uniform vec2 uFogStrength;
 
 // From vertex shader
 in vec3 fragVNorm;
 in vec3 fragVPos;
+in vec3 fragVPosWorld;
 
 #if (TEXTURE)
 	in vec2 fragUV;
@@ -134,7 +138,7 @@ in vec4 vPosLS[##NUM_FRUSTUM_LIGHTS]; // Light space position
 out vec4 oColor[3];
 
 // Calculates the point light color contribution
-vec3 calcPointLight (Light light, vec3 normal, vec3 viewDir) {
+vec3 calcPointLight (Light light, vec3 normal, vec3 viewDir, float fogF) {
 	vec3 lightDir = normalize(light.position - fragVPos);
 
 	// Difuse
@@ -149,7 +153,8 @@ vec3 calcPointLight (Light light, vec3 normal, vec3 viewDir) {
 	float attenuation = 1.0f / (uLightAtten.x + uLightAtten.y * dist + uLightAtten.z * (dist * dist));
 
 	// Transmittance
-	vec3 transmittance = exp(-uLiquidAtten * dist);
+	// TODO
+	vec3 transmittance = exp(-uLiquidAtten * fogF * dist);
 
 	// Combine results
 	vec3 diffuse  = light.color * diffuseF  * material.diffuse  * transmittance * attenuation;
@@ -159,6 +164,46 @@ vec3 calcPointLight (Light light, vec3 normal, vec3 viewDir) {
 	return (diffuse + specular);
 }
 
+float calcFogF(float depth, float height0, float height1) {
+	float y0 = min(height0, height1);
+	float y1 = max(height0, height1);
+	float yMin = uFogRange.x;
+	float yMax = uFogRange.y;
+	float x0 = uFogStrength.x;
+	float x1 = uFogStrength.y;
+
+	float F = 0.0; // Integral sum
+	if (y1 - y0 < 0.000001) {
+		if (y0 < yMin)
+			F = x0;
+		else if (y0 > yMax)
+			F = x1;
+		else
+			F = (y0 - yMin) / (yMax - yMin) * (x1 - x0) + x0;
+	} else {
+		float a, b; // Integration borders
+		if (y0 < yMin) {
+			a = y0;
+			b = min(y1, yMin);
+			F += x0 * (b - a);
+		}
+		if (y0 < yMax && y1 > yMin) {
+			a = max(y0, yMin);
+			b = min(y1, yMax);
+			F += x0 * (b - a) + (x1 - x0) / (yMax - yMin) * (0.5 * (b * b - a * a) - yMin * (b - a));
+		}
+		if (y1 > yMax) {
+			a = max(y0, yMax);
+			b = y1;
+			F += x1 * (b - a);
+		}
+		F /= (y1 - y0);
+	}
+	//F *= depth;
+
+	//return uLiquidAtten * F;
+	return F;
+}
 
 vec3 calcFrustumLight(int index, sampler2D tex, vec3 normal, vec3 viewDir) {
 	vec3 posLS = (vPosLS[index].xyz / vPosLS[index].w) * 0.5 + 0.5;
@@ -199,7 +244,10 @@ vec3 calcFrustumLight(int index, sampler2D tex, vec3 normal, vec3 viewDir) {
 		float atten = 1.0 - smoothstep(0.0, threshold, edgeDist);
 		shadow = min(shadow + atten, 1.0); 
 
-		return (1.0 - shadow) * calcPointLight(Light(false, uFrustumLights[index].position, uFrustumLights[index].color), normal, viewDir);
+		// Fog
+		float fogF = calcFogF(lightCurrentDepth, uFrustumLights[index].worldHeight, fragVPosWorld.y);
+
+		return (1.0 - shadow) * calcPointLight(Light(false, uFrustumLights[index].position, uFrustumLights[index].color), normal, viewDir, fogF);
 	}
 	return vec3(0.0);
 }
@@ -253,7 +301,7 @@ void main() {
 	#if (!NO_LIGHTS)
 		#for lightIdx in 0 to NUM_LIGHTS
 			if (!lights[##lightIdx].directional)
-				combined += calcPointLight(lights[##lightIdx], normal, viewDir);
+				combined += calcPointLight(lights[##lightIdx], normal, viewDir, 1.0);
 			else
 				combined += calcDirectLight(lights[##lightIdx], normal, viewDir);
 		#end
