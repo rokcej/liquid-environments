@@ -110,5 +110,12 @@
 			"vertex": "texture.vert",
 			"fragment": "lights/light_volume_blend.frag"
 		}
+	},
+	"custom_texture": {
+		"description": "Adds textures.",
+		"shaders": {
+			"vertex": "texture.vert",
+			"fragment": "texture.frag"
+		}
 	}
 }

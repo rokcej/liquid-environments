@@ -390,8 +390,7 @@ class App {
 			{ width: this.canvas.width, height: this.canvas.height },
 			"dummy",
 			[
-				{ id: "perlinNoise", textureConfig: RGBA16F_LINEAR},
-				{ id: "perlinNoise2", textureConfig: RGBA16F_LINEAR},
+				{ id: "perlinNoise", textureConfig: RGBA16F_LINEAR}
 			]
 		);
 		// PARTICLES UPDATE
@@ -668,7 +667,7 @@ class App {
 				mat.ligths = false;
 				return { 
 					material: mat,
-					textures: [textureMap.water, textureMap.mainDepthDist, textureMap.perlinNoise2]
+					textures: [textureMap.water, textureMap.mainDepthDist, textureMap.perlinNoise]
 				};
 			},
 			RC.RenderPass.TEXTURE,
@@ -729,7 +728,7 @@ class App {
 				mat.ligths = false;
 				return { 
 					material: mat,
-					textures: [textureMap.water, textureMap.mainDepthDist, textureMap.perlinNoise2, textureMap.blurred, textureMap.small_blur]
+					textures: [textureMap.water, textureMap.mainDepthDist, textureMap.perlinNoise, textureMap.blurred, textureMap.small_blur]
 				};
 			},
 			RC.RenderPass.TEXTURE,
@@ -825,6 +824,25 @@ class App {
 					textures: [textureMap.dof, textureMap.particleColor]
 				};
 			},
+			RC.RenderPass.TEXTURE,
+			{ width: this.canvas.width, height: this.canvas.height },
+			"dummy",
+			[
+				{ id: "final", textureConfig: RC.RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG }
+			]
+		);
+		// DISPLAY
+		this.displayPass = new RC.RenderPass(
+			RC.RenderPass.POSTPROCESS,
+			(textureMap, additionalData) => {},
+			(textureMap, additionalData) => {
+				let mat = new RC.CustomShaderMaterial("texture", {});
+				mat.ligths = false;
+				return {
+					material: mat,
+					textures: [textureMap.final]
+				};
+			},
 			RC.RenderPass.SCREEN,
     		{ width: this.canvas.width, height: this.canvas.height }
 		);
@@ -864,6 +882,8 @@ class App {
 		this.renderQueue.pushRenderPass(this.dofPass);
 
 		this.renderQueue.pushRenderPass(this.postPass);
+
+		this.renderQueue.pushRenderPass(this.displayPass);
 
 		this.once = 0;
 	}
@@ -1079,6 +1099,8 @@ class App {
 		this.particleDrawPass.viewport = { width: this.canvas.width, height: this.canvas.height };
 
 		this.postPass.viewport = { width: this.canvas.width, height: this.canvas.height };
+
+		this.displayPass.viewport = { width: this.canvas.width, height: this.canvas.height };
 		
 		// DOF focus
 		this.dof.focus.x = Math.trunc(this.canvas.width / 2.0);
