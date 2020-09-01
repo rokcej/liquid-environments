@@ -66,11 +66,12 @@ class App {
 			color: new RC.Color(0.0, 0.18, 0.4),
 			atten: new RC.Vector3(0.07, 0.06, 0.05),
 			range: new RC.Vector2(-4, 6),
+			noise: 0.8,
 			strength: new RC.Vector2(2, 0.5),
-			lightAtten: new RC.Vector3(1.0, 0.01, 0.0001)
+			lightAtten: new RC.Vector3(1.0, 0.01, 0.0001),
 		}
 		this.fog.color.multiplyScalar(0.5); // (0, 0.3, 0.7)
-		this.fog.atten.multiplyScalar(1.8);
+		this.fog.atten.multiplyScalar(2.1);
 
 		// Noise
 		this.noise = {
@@ -90,10 +91,10 @@ class App {
 		};
 		// Particles
 		this.particles = {
-			res: 1024,
+			res: 512,
 			opacity: 1,
-			intensity: 1.5,
-			size: 12,
+			intensity: 1,
+			size: 8,
 			components: 3, // Number of texels per particle
 			scene: new RC.Scene()
 		}
@@ -221,7 +222,7 @@ class App {
 		let l = {
 			intensity: 1.0,
 			beta: 0.01,
-			volumeIntensity: 2.0,
+			volumeIntensity: 1.0,
 			color: color,
 			camera: new RC.PerspectiveCamera(90, 1.0, 0.1, 500.0),
 			texture: new RC.Texture(
@@ -279,7 +280,7 @@ class App {
 		this.PMatInv = new RC.Matrix4().getInverse(this.camera.projectionMatrix);
 		
 		this.cameraManager = new RC.CameraManager();
-		this.cameraManager.addOrbitCamera(this.camera, new RC.Vector3(0, 0, 0));
+		this.cameraManager.addOrbitCamera(this.camera, new RC.Vector3(0, 0.5, 0));
 		this.cameraManager.activeCamera = this.camera;
 
 
@@ -290,8 +291,8 @@ class App {
 		//this.lights.frustum[2].volumeIntensity = 8000.0
 
 		//this.addFrustumLight(new RC.Vector3(10, 10, 10),  new RC.Vector3(0, 0, 0), new RC.Color(1, 1, 1)).intensity = 0;
-		this.addFrustumLight(new RC.Vector3(-4, 10, -20), new RC.Vector3(0, 0, 0), new RC.Color(1, 1, 1)); //.volumeIntensity = 0;
-		this.addFrustumLight(new RC.Vector3(10, 10, 10),  new RC.Vector3(0, 0, 0), new RC.Color(1, 1, 1)); //.volumeIntensity = 0;
+		this.a = this.addFrustumLight(new RC.Vector3(-4, 6, -10), new RC.Vector3(0, 0, 0), new RC.Color(1, 1, 1)); //.volumeIntensity = 0;
+		this.b = this.addFrustumLight(new RC.Vector3(10, 10, 10),  new RC.Vector3(0, 0, 0), new RC.Color(1, 1, 1)); //.volumeIntensity = 0;
 
 		// RenderCore Lights
 		// this.dLight = new RC.DirectionalLight(new RC.Color("#FFFFFF"), 1.0);
@@ -323,7 +324,7 @@ class App {
 			RC.Texture.NearestFilter, RC.Texture.NearestFilter,
 			RC.Texture.RGBA, RC.Texture.RGBA, RC.Texture.UNSIGNED_BYTE, 1, 1);
 
-		plane.translateY(-4);
+		plane.translateY(0);
 		plane.rotateX(-Math.PI * 0.5);
 
 		//plane.material.addMap(texture);
@@ -449,6 +450,7 @@ class App {
 				this.particles.mesh.material.setUniform("uFogRange", this.fog.range.toArray());
 				this.particles.mesh.material.setUniform("uFogStrength", this.fog.strength.toArray());
 				this.particles.mesh.material.setUniform("uCameraHeight", this.camera.position.y);
+				this.particles.mesh.material.setUniform("uNoiseStrength", this.fog.noise);
 				
 				this.particles.mesh.material.setUniform("f", this.dof.f);
 				this.particles.mesh.material.setUniform("a", this.dof.a);
@@ -789,7 +791,8 @@ class App {
 					"uLiquidAtten": this.fog.atten.toArray(),
 					"uFogRange": this.fog.range.toArray(),
 					"uFogStrength": this.fog.strength.toArray(),
-					"uCameraHeight": this.camera.position.y
+					"uCameraHeight": this.camera.position.y,
+					"uNoiseStrength": this.fog.noise
 				});
 				mat.ligths = false;
 				return { 
@@ -926,7 +929,7 @@ class App {
 				for (let x = -(countX-1) * space / 2; x <= (countX-1) * space / 2; x += space) {
 					for (let z = 0; z >= -(countZ-1) * space; z -= space) {
 						let clone = new RC.Mesh(obj[i].geometry, this.createPhongMat());
-						clone.position = new RC.Vector3(x, xorshift32() * 8 - 4, z - 2);
+						clone.position = new RC.Vector3(x, xorshift32() * 5, z - 2);
 
 						const colorCode = colors[Math.floor(xorshift32() * colors.length)];
 						clone.material.color = new RC.Color(colorCode);

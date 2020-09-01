@@ -534,7 +534,7 @@ void main() {
 		p.pos += p.vel * uDT;
 		p.age += uDT;
 	} else { // Respawn particle
-		p.pos = sampleUnitSphere() * 30.0 + uCameraPos;
+		p.pos = sampleUnitSphere() * 20.0 + uCameraPos;
 		p.life = rand() * 20.0;
 		//p.vel = vec3(rand(), rand(), rand()) * 0.05 - 0.025;
 		//p.vel = vec3(0.0);

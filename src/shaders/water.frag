@@ -14,6 +14,7 @@ uniform vec3 uLiquidAtten;
 uniform vec2 uFogRange;
 uniform vec2 uFogStrength;
 uniform float uCameraHeight;
+uniform float uNoiseStrength;
 
 in vec2 fragUV;
 
@@ -58,7 +59,7 @@ vec3 applyFog(vec3 color, float depth, float height, float noise) {
 	F *= depth;
 
 	// Beer's law
-	vec3 transmittance = exp(-uLiquidAtten * F * noise);
+	vec3 transmittance = exp(-uLiquidAtten * F * (noise * uNoiseStrength + 1.0 - uNoiseStrength));
 	color *= transmittance;
 
 	// Mix with background color

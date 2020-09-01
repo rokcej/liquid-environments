@@ -25,6 +25,7 @@ uniform Material material;
 
 uniform vec2 uRes; // Viewport resolution
 uniform vec2 uCameraRange; // Camera near & far values
+uniform float uNoiseStrength;
 
 in vec4 vColor;
 in vec3 vPos;
@@ -36,7 +37,7 @@ out vec4 oColor;
 
 vec3 applyFog(vec3 color, vec3 fogCoeff, float noise) {
 	// Beer's law
-	vec3 transmittance = exp(-fogCoeff * noise);
+	vec3 transmittance = exp(-fogCoeff * (noise * uNoiseStrength + 1.0 - uNoiseStrength));
 
 	return color * transmittance; // + uLiquidColor * (1.0 - transmittance.b);
 }
