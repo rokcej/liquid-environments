@@ -216,14 +216,17 @@ vec3 calcFrustumLight(int index, sampler2D tex, vec3 normal, vec3 viewDir) {
 		// Shadow bias
 		float cosTheta = abs(dot(normal, lightDir));
 		float tanTheta = sqrt(1.0 - cosTheta * cosTheta) / cosTheta; // tan = sin / cos
-		float bias = 0.0038 * lightCurrentDepth * tanTheta; // 0.05
+		float bias = min(0.0038 * lightCurrentDepth * tanTheta, 0.2); // 0.05
 
 		vec2 texelSize = 1.0 / vec2(textureSize(tex, 0));
 		float shadow = 0.0;
 
-		vec2 jitter = (rand(fragVPos) - 0.5) * texelSize;
+		//vec2 jitter = (rand(fragVPos) - 0.5) * texelSize;
 		for (int x = -1; x <= 1; ++x) {
 			for (int y = -1; y <= 1; ++y) {
+				vec2 jitter = vec2(
+					rand(fragVPos +       float(x + 2 * y)) - 0.5,
+					rand(fragVPos + 2.0 * float(x + 2 * y)) - 0.5) * texelSize;
 				float pcfDepth = texture(tex, posLS.xy + jitter + vec2(x, y) * texelSize).r * uFrustumLights[index].farPlane; 
 				shadow += lightCurrentDepth - bias > pcfDepth ? 1.0 : 0.0;        
 			}    
@@ -232,7 +235,7 @@ vec3 calcFrustumLight(int index, sampler2D tex, vec3 normal, vec3 viewDir) {
 
 		// // http://www.opengl-tutorial.org/intermediate-tutorials/tutorial-16-shadow-mapping/#poisson-sampling
 		// for (int i = 0; i < 9; ++i) {
-		// 	int idx = int(rand(fragVPos) * 47.999);
+		// 	int idx = int(rand(fragVPos + float(i)) * 47.999);
 		// 	float poissonDepth = texture(tex, posLS.xy + (poissonDisk[idx] - vec2(0.5)) * texelSize * 2.0).r * uFrustumLights[index].farPlane; 
 		// 	shadow += lightCurrentDepth - bias > poissonDepth ? 1.0 : 0.0;  
 		// }
