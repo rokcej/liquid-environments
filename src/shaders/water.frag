@@ -74,7 +74,7 @@ void main() {
 	vec2 mainDepthDist = texture(material.texture1, fragUV).rg;
 	float depth = mainDepthDist.r;
 	float height = mainDepthDist.g;
-	float noise = texture(material.texture3, fragUV).r * 0.9 + 0.1;
+	float noise = texture(material.texture3, fragUV).r;
 	mainColor = applyFog(mainColor, depth, height, noise);
 
 	//vec3 particleColor = texture(material.texture2, fragUV).rgb;

@@ -66,12 +66,12 @@ class App {
 			color: new RC.Color(0.0, 0.18, 0.4),
 			atten: new RC.Vector3(0.07, 0.06, 0.05),
 			range: new RC.Vector2(-4, 6),
-			noise: 0.8,
+			noise: 0.5,
 			strength: new RC.Vector2(2, 0.5),
 			lightAtten: new RC.Vector3(1.0, 0.01, 0.0001),
 		}
 		this.fog.color.multiplyScalar(0.5); // (0, 0.3, 0.7)
-		this.fog.atten.multiplyScalar(2.1);
+		this.fog.atten.multiplyScalar(2.2);
 
 		// Noise
 		this.noise = {
@@ -95,6 +95,7 @@ class App {
 			opacity: 1,
 			intensity: 1,
 			size: 8,
+			spawnRadius: 20,
 			components: 3, // Number of texels per particle
 			scene: new RC.Scene()
 		}
@@ -404,6 +405,7 @@ class App {
 					"uDT": this.timer.delta,
 					"uTime": this.timer.curr,
 					"uSeed": Math.random(),
+					"uSpawnRadius": this.particles.spawnRadius,
 					"uCameraPos": this.camera.position.toArray(),
 					"uNumComp": this.particles.components
 				});

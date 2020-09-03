@@ -15,6 +15,7 @@ uniform vec2 uRes;
 uniform float uDT; // Delta time
 uniform float uTime; // Total time
 uniform float uSeed;
+uniform float uSpawnRadius;
 uniform vec3 uCameraPos;
 uniform int  uNumComp;
 
@@ -534,7 +535,7 @@ void main() {
 		p.pos += p.vel * uDT;
 		p.age += uDT;
 	} else { // Respawn particle
-		p.pos = sampleUnitSphere() * 20.0 + uCameraPos;
+		p.pos = sampleUnitSphere() * uSpawnRadius + uCameraPos;
 		p.life = rand() * 20.0;
 		//p.vel = vec3(rand(), rand(), rand()) * 0.05 - 0.025;
 		//p.vel = vec3(0.0);
