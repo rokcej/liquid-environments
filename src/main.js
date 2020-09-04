@@ -63,15 +63,15 @@ class App {
 		});
 		// Liquid
 		this.fog = {
-			color: new RC.Color(0.0, 0.18, 0.4),
-			atten: new RC.Vector3(0.07, 0.06, 0.05),
+			color: new RC.Color(0.01, 0.18, 0.45),
+			atten: new RC.Vector3(0.14, 0.12, 0.10),
 			range: new RC.Vector2(-4, 6),
-			noise: 1.0,
+			noise: 0.9, // Noise strength
 			strength: new RC.Vector2(2, 0.5),
 			lightAtten: new RC.Vector3(1.0, 0.01, 0.0001),
 		}
 		this.fog.color.multiplyScalar(0.5); // (0, 0.3, 0.7)
-		this.fog.atten.multiplyScalar(3.8);
+		this.fog.atten.multiplyScalar(2.5);
 
 		// Noise
 		this.noise = {
@@ -331,7 +331,7 @@ class App {
 		plane.translateY(0);
 		plane.rotateX(-Math.PI * 0.5);
 
-		//plane.material.addMap(texture);
+		plane.material.addMap(texture);
 		this.scene.add(plane);
 
 		let plane2 = new RC.Quad({x: -64, y: 64}, {x: 64, y: -64}, this.createPhongMat());
@@ -515,6 +515,7 @@ class App {
 						object.material.setUniform("uLiquidColor", this.fog.color.toArray());
 						object.material.setUniform("uLiquidAtten", this.fog.atten.toArray());
 						object.material.setUniform("uLightAtten", this.fog.lightAtten.toArray());
+						object.material.setUniform("uNoiseStrength", this.fog.noise);
 					}
 				}
 
@@ -959,15 +960,23 @@ class App {
 			this.scene.traverse((object) => {
 				if (object instanceof RC.Mesh) {
 					if (object.material.programName === "custom_phong_liquid") {
-						//object.material.addMap(this.shadowMap.texture);
+						object.material.addSBValue("NUM_FRUSTUM_LIGHTS", this.lights.frustum.length);
+
+						// Hack to use both shadow maps and normal textures
+						let maps = object.material.maps.slice(); // Use slice() to copy by value, not by reference
+						object.material.clearMaps();
+						
+						// Add shadow maps
 						for (let l of this.lights.frustum)
 							object.material.addMap(l.texture);
-						
-						object.material.addSBValue("NUM_FRUSTUM_LIGHTS", this.lights.frustum.length);
+
+						// Continue the hack
+						for (let m of maps)
+							object.material.addMap(m);
 					}
 					//let mat = new RC.MeshBasicMaterial();
 					let mat = new RC.CustomShaderMaterial("shadow_map");
-					//mat.lights = false;
+					mat.lights = false;
 					mat.side = object.material.side;
 					// // To prevent Peter Panning
 					// switch (object.material.side) {

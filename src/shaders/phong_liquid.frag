@@ -102,6 +102,7 @@ uniform vec3 uLiquidAtten;
 uniform vec3 uLightAtten;
 uniform vec2 uFogRange;
 uniform vec2 uFogStrength;
+uniform float uNoiseStrength;
 
 // From vertex shader
 in vec3 fragVNorm;
@@ -153,8 +154,9 @@ vec3 calcPointLight (Light light, vec3 normal, vec3 viewDir, float fogF) {
 	float attenuation = 1.0f / (uLightAtten.x + uLightAtten.y * dist + uLightAtten.z * (dist * dist));
 
 	// Transmittance
-	// TODO
-	vec3 transmittance = exp(-uLiquidAtten * fogF * dist);
+	// TODO use actual noise texture
+	float noise = 1.0 - 0.5 * uNoiseStrength; // Temporary placeholder, uses the average noise value
+	vec3 transmittance = exp(-uLiquidAtten * fogF * dist * noise);
 
 	// Combine results
 	vec3 diffuse  = light.color * diffuseF  * material.diffuse  * transmittance * attenuation;
@@ -312,12 +314,12 @@ void main() {
 
 	oColor[0] = vec4(combined, alpha);
 
-	// #if (TEXTURE)
-	// 	// Apply all of the textures
-	// 	#for I_TEX in 0 to NUM_TEX
-	// 		oColor[0] *= texture(material.texture##I_TEX, fragUV);
-	// 	#end
-	// #fi
+	#if (TEXTURE)
+		// Apply all of the textures
+		#for I_TEX in NUM_FRUSTUM_LIGHTS to NUM_TEX
+			oColor[0] *= texture(material.texture##I_TEX, fragUV);
+		#end
+	#fi
 
 	#if (COLORS)
 		oColor[0] *= vec4(fragVColor.rgb, alpha);

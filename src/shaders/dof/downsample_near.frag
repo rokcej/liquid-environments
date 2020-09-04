@@ -54,7 +54,7 @@ void main() {
 		));
 	}
 	float depth = min(min(minDepth.x, minDepth.y), min(minDepth.z, minDepth.w));
-	float noise = texture(material.texture2, fragUV).g;
+	//float noise = texture(material.texture2, fragUV).g;
 
 	// CoC
 	float coc = 0.0;

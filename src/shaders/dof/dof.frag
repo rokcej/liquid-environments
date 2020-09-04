@@ -71,7 +71,7 @@ void main() {
 	vec3 large  = texture(material.texture3, fragUV).rgb;
 
 	float depth = texture(material.texture1, fragUV).r;
-	float noise = texture(material.texture2, fragUV).g;
+	//float noise = texture(material.texture2, fragUV).g;
 
 	float cocNear = med.a;
 	float cocFar = 0.0;
