@@ -66,12 +66,12 @@ class App {
 			color: new RC.Color(0.01, 0.18, 0.45),
 			atten: new RC.Vector3(0.14, 0.12, 0.10),
 			range: new RC.Vector2(-4, 6),
-			noise: 0.9, // Noise strength
+			noise: 1.0, // Noise strength
 			strength: new RC.Vector2(2, 0.5),
 			lightAtten: new RC.Vector3(1.0, 0.01, 0.0001),
 		}
 		this.fog.color.multiplyScalar(0.5); // (0, 0.3, 0.7)
-		this.fog.atten.multiplyScalar(2.5);
+		this.fog.atten.multiplyScalar(3.0);
 
 		// Noise
 		this.noise = {
@@ -95,14 +95,14 @@ class App {
 			res: 512,
 			components: 2, // Number of texels per particle
 			// Dynamic
-			opacity: 1,
-			intensity: 2, // Multiplies illumination
+			opacity: 2,
+			intensity: 2.5, // Multiplies illumination
 			size: 10,
-			spawnRadius: 20,
+			spawnRadius: 25,
 			lifespan: new RC.Vector2(5, 25),
 			flowScale: 4.0,
 			flowEvolution: 0.1,
-			flowSpeed: 0.2,
+			flowSpeed: 0.3,
 			// Other
 			scene: new RC.Scene()
 		}
@@ -900,8 +900,6 @@ class App {
 		this.renderQueue.pushRenderPass(this.postPass);
 
 		this.renderQueue.pushRenderPass(this.displayPass);
-
-		this.once = 0;
 	}
 
 	loadResources(callback) {
@@ -1071,10 +1069,12 @@ class App {
 		//this.renderer.render(this.scene, this.camera);
 		this.renderQueue.render();
 
-		if (this.once == 200) {
-			this.renderQueue.removeRenderPass(this.airlightLookupPass);
-		}
-		if (this.once > 200) {
+		if (this.renderer.succeeded) {
+			if (this.airlightLookupRendered === undefined) {
+				this.renderQueue.removeRenderPass(this.airlightLookupPass);
+				this.airlightLookupRendered = true;
+			}
+
 			// Swap WebGL textures
 			let glmap = this.renderer._glManager._textureManager._cached_textures;
 			let tex1 = glmap.get(this.particles.texture[0]);
@@ -1088,7 +1088,6 @@ class App {
 			// map.particlesRead = map.particlesWrite;
 			// map.particlesWrite = temp;
 		}
-		++this.once;	
 	}
 
 	resize() {

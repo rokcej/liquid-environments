@@ -51,6 +51,7 @@ uniform vec3 uLightAtten;
 uniform vec2 uFogRange;
 uniform vec2 uFogStrength;
 uniform float uCameraHeight;
+uniform float uNoiseStrength;
 
 uniform float f; // Focal length
 uniform float a; // Aperture radius
@@ -113,7 +114,9 @@ vec3 calcLight(Light light) {
 	if (!light.directional) { // Point light
 		float dist = length(light.position - vPos);
 		// Transmittance
-		vec3 transmittance = exp(-uLiquidAtten * dist);
+		// TODO use actual noise texture
+		float noise = 1.0 - 0.5 * uNoiseStrength; // Temporary placeholder, uses the average noise value
+		vec3 transmittance = exp(-uLiquidAtten * dist * noise);
 		return light.color * calcLightAtten(dist) * transmittance;
 	} else { // Directional light
 		vec3 lightDir = normalize(light.position);
@@ -173,8 +176,10 @@ void main() {
 	// Fog
 	vFogCoeff = calcFog(vDepthDist, pos.y, uCameraHeight);
 
-    // Opacity
+    // Opacity of subpixel particles
     float opacity = vProjSize >= 1.0 ? 1.0 : vProjSize * vProjSize;
+
+	// Opacity of new/old particles
     float fadeTime = 1.0;
     opacity *= min(smoothstep(0.0, fadeTime, age), smoothstep(0.0, fadeTime, life));
 
