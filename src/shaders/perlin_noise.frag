@@ -1,7 +1,8 @@
 #version 300 es
 precision mediump float;
 
-#define M_PI 3.141592653589793238462643
+#define M_PI    3.141592653589793238462643
+#define M_SQRT2 1.414213562373095048801689
 
 out vec4 oColor;
 
@@ -39,7 +40,7 @@ float rand_constant(vec2 xy) {
 }
 // http://byteblacksmith.com/improvements-to-the-canonical-one-liner-glsl-rand-for-opengl-es-2-0/
 float rand_constant(vec3 xyz) { // Edited for 3D
-    return fract(sin(mod(dot(xyz.xyz, vec3(12.9898, 78.233, 5.1337)), 3.14)) * 43667.146508724461335325378948);
+    return fract(sin(mod(dot(xyz.xyz, vec3(12.9898, 78.233, 5.1337)), 3.14)) * 43758.5453);
 }
 
 
@@ -52,12 +53,6 @@ float rand_constant(vec3 xyz) { // Edited for 3D
 // Random unit-length vector
 vec2 getGradient2D(vec2 ixy) {
 	srand(rand_constant(ixy + 0.5)); // Add 0.5 to avoid 0
-
-	// // Cartesian coordinates
-	// float x = rand() * 2.0 - 1.0;
-	// float y = sqrt(1.0 - x * x);
-	// if (rand() < 0.5) y *= -1.0; // Flip coin to decide y sign 
-	// return vec2(x, y);
 
 	// Polar coordinates
 	float phi = 2.0 * M_PI * rand();
@@ -106,10 +101,10 @@ float _perlinNoise2D(vec2 p) {
 		mix(w01, w11, t.x),
 		t.y
 	);
-	// Output range or Perlin noise is [-sqrt(n)/2, sqrt(n)/2], where n is the number of dimensions
+
 	// https://www.gamedev.net/forums/topic/285533-2d-perlin-noise-gradient-noise-range--/#entry2794056
 	// Scale output to range [-1, 1]
-	return w_xy * 1.414213562373095048801689; // * 2 / sqrt(2)
+	return w_xy;
 }
 float _perlinNoise3D(vec3 p) {
 	// Integer position
@@ -131,11 +126,10 @@ float _perlinNoise3D(vec3 p) {
 	vec4 w_x = mix(vec4(w000, w001, w010, w011), vec4(w100, w101, w110, w111), t.x);
 	vec2 w_xy = mix(w_x.xy,	w_x.zw,	t.y);
 	float w_xyz = mix(w_xy.x, w_xy.y, t.z);
-	// Output range or Perlin noise is [-sqrt(n)/2, sqrt(n)/2], where n is the number of dimensions
+	
 	// https://www.gamedev.net/forums/topic/285533-2d-perlin-noise-gradient-noise-range--/#entry2794056
 	// Scale output to range [-1, 1]
-	// * 1.15470053837925152901830; // * 2 / sqrt(3)
-	return w_xyz * 1.414213562373095048801689; // * sqrt(2) // That's how Ken Perlin does it
+	return w_xyz * M_SQRT2; // That's how Ken Perlin does it
 }
 
 // Callable Perlin noise functions
@@ -260,7 +254,6 @@ void main() {
 	// if (xyz.z > 36000.0)
 	// xyz.z -= 36000.0;
 
-	//float val = perlinNoise2D(xyz.xy, uScale, uOctaves);
 	float val = perlinNoise3D(xyz, uOctaves);
 	float val2 = perlinNoise3D(xyz + vec3(0.0, 0.0, 6.283), uOctaves);
 

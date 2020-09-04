@@ -154,12 +154,11 @@ vec3 calcFrustumLight(int index, sampler2D tex, vec3 posWorld) {
 void main() {
     // Data
     vec4 texel0 = texture(material.texture0, VPos.xy);
-    //vec4 texel1 = texture(material.texture0, VPos.xy + vec2(uvOff, 0.0));
-    vec4 texel2 = texture(material.texture0, VPos.xy + vec2(uvOff * 2.0, 0.0));
+    vec4 texel1 = texture(material.texture0, VPos.xy + vec2(uvOff, 0.0));
 
     vec3 pos = texel0.xyz;
-    float life = texel0.w;
-    float age  = texel2.w;
+    float life = texel1.x;
+    float age  = texel1.y;
 
     // Projected position
     vec4 eyePos = MVMat * vec4(pos, 1.0);

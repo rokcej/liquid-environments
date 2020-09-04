@@ -66,18 +66,18 @@ class App {
 			color: new RC.Color(0.0, 0.18, 0.4),
 			atten: new RC.Vector3(0.07, 0.06, 0.05),
 			range: new RC.Vector2(-4, 6),
-			noise: 0.5,
+			noise: 1.0,
 			strength: new RC.Vector2(2, 0.5),
 			lightAtten: new RC.Vector3(1.0, 0.01, 0.0001),
 		}
 		this.fog.color.multiplyScalar(0.5); // (0, 0.3, 0.7)
-		this.fog.atten.multiplyScalar(2.2);
+		this.fog.atten.multiplyScalar(3.8);
 
 		// Noise
 		this.noise = {
 			scale: 2.5,
 			contrast: 1.0,
-			speed: 0.8,
+			speed: 0.75,
 			octaves: 2,
 			persistence: 0.5,
 			lacunarity: 2.0
@@ -91,12 +91,19 @@ class App {
 		};
 		// Particles
 		this.particles = {
+			// Static
 			res: 512,
+			components: 2, // Number of texels per particle
+			// Dynamic
 			opacity: 1,
-			intensity: 1,
-			size: 8,
+			intensity: 2,
+			size: 12,
 			spawnRadius: 20,
-			components: 3, // Number of texels per particle
+			lifespan: new RC.Vector2(5, 25),
+			flowScale: 4.0,
+			flowEvolution: 0.1,
+			flowSpeed: 0.2,
+			// Other
 			scene: new RC.Scene()
 		}
 	}
@@ -110,9 +117,9 @@ class App {
 			for (let x = 0; x < sz; ++x) {
 				let i = y * sz + x;
 				// Life
-				particleData[n_comp * 4 * i + 3] = 0.0;
+				particleData[n_comp * 4 * i + 4] = 0.0;
 				// Random
-				particleData[n_comp * 4 * i + 7] = Math.random();
+				particleData[n_comp * 4 * i + 6] = Math.random();
 			}
 		}
 
@@ -260,11 +267,7 @@ class App {
 		if (specular === undefined) specular = new RC.Color(1, 1, 1);
 		if (shininess === undefined) shininess = 1.0;
 
-		let mat = new RC.CustomShaderMaterial("phong_liquid", {
-			"uLiquidColor": this.fog.color.toArray(),
-			"uLiquidAtten": this.fog.atten.toArray(),
-			"uLightAtten": this.fog.lightAtten.toArray()
-		});
+		let mat = new RC.CustomShaderMaterial("phong_liquid", {});
 		mat.color = color;
 		mat.specular = specular;
 		mat.shininess = shininess;
@@ -406,6 +409,10 @@ class App {
 					"uTime": this.timer.curr,
 					"uSeed": Math.random(),
 					"uSpawnRadius": this.particles.spawnRadius,
+					"uLifespan": this.particles.lifespan.toArray(),
+					"uFlowScale": this.particles.flowScale,
+					"uFlowEvolution": this.particles.flowEvolution,
+					"uFlowSpeed": this.particles.flowSpeed,
 					"uCameraPos": this.camera.position.toArray(),
 					"uNumComp": this.particles.components
 				});
@@ -505,6 +512,9 @@ class App {
 						object.material.setUniform("uMMat", object.matrix.toArray());
 						object.material.setUniform("uFogRange", this.fog.range.toArray());
 						object.material.setUniform("uFogStrength", this.fog.strength.toArray());
+						object.material.setUniform("uLiquidColor", this.fog.color.toArray());
+						object.material.setUniform("uLiquidAtten", this.fog.atten.toArray());
+						object.material.setUniform("uLightAtten", this.fog.lightAtten.toArray());
 					}
 				}
 
@@ -923,18 +933,18 @@ class App {
 				this.scene.add(obj[i]);
 
 				// Clone bunnies
-				const countX = 6;
-				const countZ = 8;
+				const countX = 4;
+				const countZ = 4;
 				const space = 4;
 				const colors = Object.values(RC.Color.NAMES);
 
 				for (let x = -(countX-1) * space / 2; x <= (countX-1) * space / 2; x += space) {
 					for (let z = 0; z >= -(countZ-1) * space; z -= space) {
 						let clone = new RC.Mesh(obj[i].geometry, this.createPhongMat());
-						clone.position = new RC.Vector3(x, xorshift32() * 5, z - 2);
+						clone.position = new RC.Vector3(x, xorshift32() * 4, z + 6);
 
 						const colorCode = colors[Math.floor(xorshift32() * colors.length)];
-						clone.material.color = new RC.Color(colorCode);
+						clone.material.color = new RC.Color(colorCode).addScalar(0.2);
 						clone.material.specular = new RC.Color("#444444");
 						clone.material.shininess = 8;
 						this.scene.add(clone);
