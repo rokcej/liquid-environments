@@ -40,7 +40,7 @@ class App {
 		this.fpsTime = 0;
 		// DOF
 		this.dof = {
-			f: 8.0, // Focal length
+			f: 100.0, // Focal length
 			a: 1.0, // Aperture radius
 			v0: 4.0, // Distance in focus
 			v0_target: 4.0,
@@ -96,8 +96,8 @@ class App {
 			components: 2, // Number of texels per particle
 			// Dynamic
 			opacity: 1,
-			intensity: 2,
-			size: 12,
+			intensity: 2, // Multiplies illumination
+			size: 10,
 			spawnRadius: 20,
 			lifespan: new RC.Vector2(5, 25),
 			flowScale: 4.0,
@@ -1027,7 +1027,7 @@ class App {
 				// Unbind the framebuffer
 				this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
 
-				this.dof.v0_target = pixel[0];
+				this.dof.v0_target = Math.min(pixel[0], this.dof.f * 0.9);
 				this.dof.lastUpdate = this.timer.curr;
 			}
 		}

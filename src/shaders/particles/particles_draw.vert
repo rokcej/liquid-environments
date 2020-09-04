@@ -180,7 +180,9 @@ void main() {
 
     // Pseudo-DOF
     float coc = a * abs(f / (v0 - f)) * abs(v0 / vDepthDist - 1.0);
-	opacity /= 1.0 + coc * 0.4;
+	float blurredSize = vProjSize + coc;
+	opacity *= (vProjSize * vProjSize) / (blurredSize * blurredSize);
+	vProjSize = blurredSize;
 
     // RenderCore Lights
 	vec3 illum = ambient;
