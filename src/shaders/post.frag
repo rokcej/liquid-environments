@@ -9,6 +9,8 @@ struct Material {
 
 uniform Material material;
 
+uniform float uRGBShift;
+
 #if (TEXTURE)
     in vec2 fragUV;
 #fi
@@ -25,7 +27,7 @@ void main() {
 
 	#if (RGB_SHIFT)
 	float coc = tex0.a;
-	vec3 off = vec3(0.004, 0.0, -0.004) * coc;
+	vec3 off = vec3(uRGBShift, 0.0, -uRGBShift) * coc;
 	color.r = texture(material.texture0, (fragUV - 0.5) * (1.0 + off.r) + 0.5).r;
 	color.g = texture(material.texture0, (fragUV - 0.5) * (1.0 + off.g) + 0.5).g;
 	color.b = texture(material.texture0, (fragUV - 0.5) * (1.0 + off.b) + 0.5).b;

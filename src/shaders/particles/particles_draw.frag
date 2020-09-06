@@ -37,9 +37,10 @@ out vec4 oColor;
 
 vec3 applyFog(vec3 color, vec3 fogCoeff, float noise) {
 	// Beer's law
-	vec3 transmittance = exp(-fogCoeff * (noise * uNoiseStrength + 1.0 - uNoiseStrength));
+	float offset = 2.0 * noise * uNoiseStrength + 1.0 - uNoiseStrength;
+	vec3 transmittance = exp(-fogCoeff * offset);
 
-	return color * transmittance; // + uLiquidColor * (1.0 - transmittance.b);
+	return color * transmittance; // + uLiquidColor * (1.0 - max(max(transmittance.r, transmittance.g), transmittance.b));
 }
 
 void main() {

@@ -59,11 +59,12 @@ vec3 applyFog(vec3 color, float depth, float height, float noise) {
 	F *= depth;
 
 	// Beer's law
-	vec3 transmittance = exp(-uLiquidAtten * F * (noise * uNoiseStrength + 1.0 - uNoiseStrength));
+	float offset = 2.0 * noise * uNoiseStrength + 1.0 - uNoiseStrength; // x / (2 - x) : [0, 2] -> [0, inf]
+	vec3 transmittance = exp(-uLiquidAtten * F * offset);
 	color *= transmittance;
 
 	// Mix with background color
-	color += uLiquidColor * (1.0 - transmittance.b);
+	color += uLiquidColor * (1.0 - max(max(transmittance.r, transmittance.g), transmittance.b));
 
 	return color;
 }

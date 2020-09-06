@@ -257,5 +257,5 @@ void main() {
 	float val = perlinNoise3D(xyz, uOctaves);
 	float val2 = 0.0; // perlinNoise3D(xyz + vec3(0.0, 0.0, 6.283), uOctaves);
 
-	oColor = vec4(val, val2, 0.0,  1.0);
+	oColor = vec4(val, val, val,  1.0);
 }

@@ -1,4 +1,4 @@
-import * as RC from "/rendercore/src/RenderCore.js";
+import * as RC from "../rendercore/src/RenderCore.js";
 
 class App {
 	constructor(canvas) {
@@ -8,16 +8,17 @@ class App {
 		// Renderer
 		this.renderer = new RC.MeshRenderer(this.canvas, RC.WEBGL2);
 		this.renderer.clearColor = "#000000FF";
-		this.renderer.addShaderLoaderUrls("/rendercore/src/shaders");
-		this.renderer.addShaderLoaderUrls("/src/shaders");
+		this.renderer.addShaderLoaderUrls("rendercore/src/shaders");
+		this.renderer.addShaderLoaderUrls("src/shaders");
 		
 		this.gl = this.renderer._gl;
 
 		this.keyboardInput = RC.KeyboardInput.instance;
 		this.mouseInput = RC.MouseInput.instance;
-		this.mouseInput.setSourceObject(window);
+		this.mouseInput.setSourceObject(this.canvas);
 
 		this.initSettings();
+		this.initGUI();
 		this.initParticles();
 		this.initLightVolumes();
 		this.initScene();
@@ -40,20 +41,23 @@ class App {
 		this.fpsTime = 0;
 		// DOF
 		this.dof = {
+			// Public
 			f: 100.0, // Focal length
 			a: 1.0, // Aperture radius
 			v0: 4.0, // Distance in focus
+			rgbShift: 0.004,
+			// Private
 			v0_target: 4.0,
 			numPasses: 1,
 			lastUpdate: 0.0,
 			focus: {x: 640, y: 360},
 			mousedown: {x: -1, y: -1}
 		}		
-		document.addEventListener("mousedown", (event) => {
+		this.canvas.addEventListener("mousedown", (event) => {
 			this.dof.mousedown.x = event.clientX;
 			this.dof.mousedown.y = event.clientY;
 		});
-		document.addEventListener("mouseup", (event) => {
+		this.canvas.addEventListener("mouseup", (event) => {
 			let x = event.clientX, y = event.clientY;
 			if (x === this.dof.mousedown.x && y === this.dof.mousedown.y &&
 				x >= 0 && x < this.canvas.width && y >= 0 && y < this.canvas.height) {
@@ -64,14 +68,15 @@ class App {
 		// Liquid
 		this.fog = {
 			color: new RC.Color(0.01, 0.18, 0.45),
-			atten: new RC.Vector3(0.14, 0.12, 0.10),
+			extinction: new RC.Vector3(0.07, 0.06, 0.05),
 			range: new RC.Vector2(-4, 6),
 			noise: 1.0, // Noise strength
 			strength: new RC.Vector2(2, 0.5),
-			lightAtten: new RC.Vector3(1.0, 0.01, 0.0001),
+			lightAtten: new RC.Vector2(0.01, 0.0001),
+			lightExtinction: 1.0
 		}
 		this.fog.color.multiplyScalar(0.5); // (0, 0.3, 0.7)
-		this.fog.atten.multiplyScalar(3.0);
+		this.fog.extinction.multiplyScalar(3.0);
 
 		// Noise
 		this.noise = {
@@ -80,7 +85,8 @@ class App {
 			speed: 0.75,
 			octaves: 2,
 			persistence: 0.5,
-			lacunarity: 2.0
+			lacunarity: 2.0,
+			show: false
 		}
 		// Lights
 		this.lights = {
@@ -95,7 +101,7 @@ class App {
 			res: 512,
 			components: 2, // Number of texels per particle
 			// Dynamic
-			opacity: 2,
+			opacity: 1,
 			intensity: 2.5, // Multiplies illumination
 			size: 10,
 			spawnRadius: 25,
@@ -106,6 +112,75 @@ class App {
 			// Other
 			scene: new RC.Scene()
 		}
+	}
+
+	initGUI() {
+		let params = {
+			fcol: this.fog.color.clone().multiplyScalar(255).toArray(),
+			pcol: [255, 255, 255]
+		};
+
+		this.gui = new dat.GUI();
+
+		// Fog
+		let fog = this.gui.addFolder("Fog");
+
+		fog.addColor(params, "fcol").name("Color").onChange(() => {
+			this.fog.color.setRGB(params.fcol[0]/255, params.fcol[1]/255, params.fcol[2]/255);
+		});
+		fog.add(this.fog, "noise", 0, 1).name("Noise strength");
+
+		let extinction = fog.addFolder("Extinction coefficient");
+		extinction.add(this.fog.extinction, "x", 0, 1).name("Red");
+		extinction.add(this.fog.extinction, "y", 0, 1).name("Green");
+		extinction.add(this.fog.extinction, "z", 0, 1).name("Blue");
+		extinction.add(this.fog, "lightExtinction", 0, 1).name("Light extinction")
+
+		let layered = fog.addFolder("Layered fog");
+		layered.add(this.fog.range, "x", -10, 10).name("Bottom height");
+		layered.add(this.fog.range, "y", -10, 10).name("Top height");
+		layered.add(this.fog.strength, "x", 0, 4).name("Bottom strength");
+		layered.add(this.fog.strength, "y", 0, 4).name("Top strength");
+		
+		let lightAtten = fog.addFolder("Light attenuation");
+		lightAtten.add(this.fog.lightAtten, "x", 0).name("Linear");
+		lightAtten.add(this.fog.lightAtten, "y", 0).name("Quadratic");
+
+
+		// Particles
+		let part = this.gui.addFolder("Particles");
+		let papp = part.addFolder("Appearance");
+		papp.addColor(params, "pcol").name("Color").onChange(() => {
+			if (this.particles.mesh !== undefined)
+				this.particles.mesh.material.color.setRGB(params.pcol[0]/255, params.pcol[1]/255, params.pcol[2]/255);
+		});
+		papp.add(this.particles, "opacity", 0, 1).name("Opacity");
+		papp.add(this.particles, "intensity", 0, 5).name("Intensity");
+		papp.add(this.particles, "size", 0, 64).name("Size");
+		let pbeh = part.addFolder("Behavior");
+		pbeh.add(this.particles, "spawnRadius", 0, 100).name("Spawn radius");
+		pbeh.add(this.particles.lifespan, "x", 0, 20).name("Min lifespan");
+		pbeh.add(this.particles.lifespan, "y", 0, 100).name("Max lifespan");
+		pbeh.add(this.particles, "flowScale", 0, 20).name("Flow scale");
+		pbeh.add(this.particles, "flowEvolution", 0, 1).name("Flow evolution");
+		pbeh.add(this.particles, "flowSpeed", 0, 2).name("Flow speed");
+
+
+		// DOF
+		let dof = this.gui.addFolder("Depth of field");
+		dof.add(this.dof, "f", 0, 128).name("Focal length");
+		dof.add(this.dof, "a", 0, 4).name("Aperture radius");
+		dof.add(this.dof, "rgbShift", 0, 0.02).name("RGB shift");
+
+		// Noise
+		let noise = this.gui.addFolder("Noise");
+		noise.add(this.noise, "scale", 0, 10).name("Scale");
+		noise.add(this.noise, "contrast", 0, 5).name("Contrast");
+		noise.add(this.noise, "speed", 0, 4).name("Speed");
+		noise.add(this.noise, "octaves", 0, 16, 1).name("Octaves");
+		noise.add(this.noise, "persistence", 0, 1).name("Persistence");
+		noise.add(this.noise, "lacunarity", 1, 10).name("Lacunarity");
+		noise.add(this.noise, "show").name("Show texture");
 	}
 
 	initParticles() {
@@ -301,10 +376,11 @@ class App {
 		// RenderCore Lights
 		// this.dLight = new RC.DirectionalLight(new RC.Color("#FFFFFF"), 1.0);
 		// this.dLight.position = new RC.Vector3(1.0, 0.5, 0.8);
-		this.pLight = new RC.PointLight(new RC.Color("#FFFFFF"), 1.0);
-		this.pLight.position = new RC.Vector3(-4.0, 10.0, -20.0);
-		this.pLight2 = new RC.PointLight(new RC.Color("#FFFFFF"), 1.0);
-		this.pLight2.position = new RC.Vector3(10.0, 10.0, 10.0);
+
+		// this.pLight = new RC.PointLight(new RC.Color("#FFFFFF"), 1.0);
+		// this.pLight.position = new RC.Vector3(-4.0, 10.0, -20.0);
+		// this.pLight2 = new RC.PointLight(new RC.Color("#FFFFFF"), 1.0);
+		// this.pLight2.position = new RC.Vector3(10.0, 10.0, 10.0);
 		this.aLight = new RC.AmbientLight(new RC.Color("#FFFFFF"), 0.03);
 
 		//this.pLight.add(new RC.Cube(1.0, this.pLight.color));
@@ -450,16 +526,16 @@ class App {
 				this.particles.mesh.material.opacity = this.particles.opacity;
 				this.particles.mesh.material.pointSize = this.particles.size;
 				this.particles.mesh.material.setUniform("uIntensity", this.particles.intensity);
-
 				this.particles.mesh.material.setUniform("uRes", [this.canvas.width, this.canvas.height]);
 				this.particles.mesh.material.setUniform("uCameraRange", [this.camera.near, this.camera.far]);
 				this.particles.mesh.material.setUniform("uLiquidColor", this.fog.color.toArray());
-				this.particles.mesh.material.setUniform("uLiquidAtten", this.fog.atten.toArray());
+				this.particles.mesh.material.setUniform("uLiquidAtten", this.fog.extinction.toArray());
 				this.particles.mesh.material.setUniform("uLightAtten", this.fog.lightAtten.toArray());
 				this.particles.mesh.material.setUniform("uFogRange", this.fog.range.toArray());
 				this.particles.mesh.material.setUniform("uFogStrength", this.fog.strength.toArray());
 				this.particles.mesh.material.setUniform("uCameraHeight", this.camera.position.y);
 				this.particles.mesh.material.setUniform("uNoiseStrength", this.fog.noise);
+				this.particles.mesh.material.setUniform("uLightExtinction", this.fog.lightExtinction);
 				
 				this.particles.mesh.material.setUniform("f", this.dof.f);
 				this.particles.mesh.material.setUniform("a", this.dof.a);
@@ -513,9 +589,10 @@ class App {
 						object.material.setUniform("uFogRange", this.fog.range.toArray());
 						object.material.setUniform("uFogStrength", this.fog.strength.toArray());
 						object.material.setUniform("uLiquidColor", this.fog.color.toArray());
-						object.material.setUniform("uLiquidAtten", this.fog.atten.toArray());
+						object.material.setUniform("uLiquidAtten", this.fog.extinction.toArray());
 						object.material.setUniform("uLightAtten", this.fog.lightAtten.toArray());
 						object.material.setUniform("uNoiseStrength", this.fog.noise);
+						object.material.setUniform("uLightExtinction", this.fog.lightExtinction);
 					}
 				}
 
@@ -801,7 +878,7 @@ class App {
 			(textureMap, additionalData) => {
 				let mat = new RC.CustomShaderMaterial("water", {
 					"uLiquidColor": this.fog.color.toArray(),
-					"uLiquidAtten": this.fog.atten.toArray(),
+					"uLiquidAtten": this.fog.extinction.toArray(),
 					"uFogRange": this.fog.range.toArray(),
 					"uFogStrength": this.fog.strength.toArray(),
 					"uCameraHeight": this.camera.position.y,
@@ -832,7 +909,9 @@ class App {
 			RC.RenderPass.POSTPROCESS,
 			(textureMap, additionalData) => {},
 			(textureMap, additionalData) => {
-				let mat = new RC.CustomShaderMaterial("post", {});
+				let mat = new RC.CustomShaderMaterial("post", {
+					"uRGBShift": this.dof.rgbShift
+				});
 				mat.addSBFlag("RGB_SHIFT");
 				mat.ligths = false;
 				return { 
@@ -856,7 +935,7 @@ class App {
 				mat.ligths = false;
 				return {
 					material: mat,
-					textures: [textureMap.final]
+					textures: [this.noise.show ? textureMap.perlinNoise : textureMap.final]
 				};
 			},
 			RC.RenderPass.SCREEN,
@@ -907,7 +986,7 @@ class App {
 		this.objLoader = new RC.ObjLoader(this.manager);
 		//this.imageLoader = new RC.ImageLoader(this.manager);
 
-		this.objLoader.load("/data/models/bunny.obj", (obj) => {
+		this.objLoader.load("data/models/bunny.obj", (obj) => {
 			this.objects = obj;
 
 			let xorshift32_state = new Uint32Array([0.4 * 0xFFFFFFFF]);

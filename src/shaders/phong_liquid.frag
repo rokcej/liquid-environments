@@ -99,10 +99,11 @@ float alpha = 1.0;
 #fi
 
 uniform vec3 uLiquidAtten;
-uniform vec3 uLightAtten;
+uniform vec2 uLightAtten;
 uniform vec2 uFogRange;
 uniform vec2 uFogStrength;
 uniform float uNoiseStrength;
+uniform float uLightExtinction;
 
 // From vertex shader
 in vec3 fragVNorm;
@@ -151,12 +152,11 @@ vec3 calcPointLight (Light light, vec3 normal, vec3 viewDir, float fogF) {
 
 	// Attenuation
 	float dist = length(light.position - fragVPos);
-	float attenuation = 1.0f / (uLightAtten.x + uLightAtten.y * dist + uLightAtten.z * (dist * dist));
+	float attenuation = 1.0f / (1.0 + uLightAtten.x * dist + uLightAtten.y * (dist * dist));
 
 	// Transmittance
 	// TODO use actual noise texture
-	float noise = 1.0 - 0.5 * uNoiseStrength; // Temporary placeholder, uses the average noise value
-	vec3 transmittance = exp(-uLiquidAtten * fogF * dist * noise);
+	vec3 transmittance = exp(-uLiquidAtten * fogF * dist * uLightExtinction);
 
 	// Combine results
 	vec3 diffuse  = light.color * diffuseF  * material.diffuse  * transmittance * attenuation;

@@ -47,11 +47,12 @@ uniform float uIntensity;
 
 uniform vec3 uLiquidColor;
 uniform vec3 uLiquidAtten;
-uniform vec3 uLightAtten;
+uniform vec2 uLightAtten;
 uniform vec2 uFogRange;
 uniform vec2 uFogStrength;
 uniform float uCameraHeight;
 uniform float uNoiseStrength;
+uniform float uLightExtinction;
 
 uniform float f; // Focal length
 uniform float a; // Aperture radius
@@ -107,7 +108,7 @@ vec3 calcFog(float depth, float height0, float height1) {
 
 float calcLightAtten(float dist) {
     // Attenuation
-    return 1.0f / (uLightAtten.x + uLightAtten.y * dist + uLightAtten.z * (dist * dist));
+    return 1.0f / (1.0 + uLightAtten.x * dist + uLightAtten.y * (dist * dist));
 }
 
 vec3 calcLight(Light light) {
@@ -115,8 +116,7 @@ vec3 calcLight(Light light) {
 		float dist = length(light.position - vPos);
 		// Transmittance
 		// TODO use actual noise texture
-		float noise = 1.0 - 0.5 * uNoiseStrength; // Temporary placeholder, uses the average noise value
-		vec3 transmittance = exp(-uLiquidAtten * dist * noise);
+		vec3 transmittance = exp(-uLiquidAtten * dist * uLightExtinction);
 		return light.color * calcLightAtten(dist) * transmittance;
 	} else { // Directional light
 		vec3 lightDir = normalize(light.position);
@@ -145,8 +145,9 @@ vec3 calcFrustumLight(int index, sampler2D tex, vec3 posWorld) {
 		shadow = min(shadow + atten, 1.0); 
 
 		// Transmittance
+		// TODO use actual noise texture
 		vec3 fogCoeff = calcFog(lightCurrentDepth, posWorld.y, uFrustumLights[index].worldHeight);
-		vec3 transmittance = exp(-fogCoeff);
+		vec3 transmittance = exp(-fogCoeff * uLightExtinction);
 
 		return (1.0 - shadow) * uFrustumLights[index].color * calcLightAtten(lightCurrentDepth) * transmittance;
 	}
