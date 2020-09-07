@@ -218,7 +218,7 @@ vec3 calcFrustumLight(int index, sampler2D tex, vec3 normal, vec3 viewDir) {
 		// Shadow bias
 		float cosTheta = abs(dot(normal, lightDir));
 		float tanTheta = sqrt(1.0 - cosTheta * cosTheta) / cosTheta; // tan = sin / cos
-		float bias = min(0.0038 * lightCurrentDepth * tanTheta, 0.2); // 0.05
+		float bias = min(0.004 * lightCurrentDepth * tanTheta, 0.2); // 0.05
 
 		vec2 texelSize = 1.0 / vec2(textureSize(tex, 0));
 		float shadow = 0.0;

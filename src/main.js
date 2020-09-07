@@ -27,13 +27,14 @@ class App {
 
 		window.addEventListener("resize", () => { this.resize(); }, false);
 
-		this.loadResources(
-			() => { window.requestAnimationFrame(() => { this.update(); }); }
-		);
+		this.loadResources(() => { this.start(); });
 		//window.requestAnimationFrame(() => { this.update(); });
 	}
 
 	initSettings() {
+		// Params
+		const urlParams = new URLSearchParams(window.location.search);
+
 		// Animation timer
 		this.timer = { curr: 0, prev: 0, delta: 0 };
 		// FPS
@@ -90,7 +91,7 @@ class App {
 		}
 		// Lights
 		this.lights = {
-			shadowRes: 1024,
+			shadowRes: parseInt(urlParams.get("shadows") || 1024),
 			lookupRes: 256,
 			frustum: [],
 			point: []
@@ -98,7 +99,7 @@ class App {
 		// Particles
 		this.particles = {
 			// Static
-			res: 512,
+			res: parseInt(urlParams.get("particles") || 512),
 			components: 2, // Number of texels per particle
 			// Dynamic
 			opacity: 1,
@@ -117,7 +118,13 @@ class App {
 	initGUI() {
 		let params = {
 			fcol: this.fog.color.clone().multiplyScalar(255).toArray(),
-			pcol: [255, 255, 255]
+			pcol: [255, 255, 255],
+			add: () => {
+				let url = new URL(window.location.href);
+				url.searchParams.set("particles", parseInt(this.particles.res));
+				url.searchParams.set("shadows", parseInt(this.lights.shadowRes));
+				window.location.replace(url);
+			}
 		};
 
 		this.gui = new dat.GUI();
@@ -181,6 +188,13 @@ class App {
 		noise.add(this.noise, "persistence", 0, 1).name("Persistence");
 		noise.add(this.noise, "lacunarity", 1, 10).name("Lacunarity");
 		noise.add(this.noise, "show").name("Show texture");
+
+		// Complexity
+		let complex = this.gui.addFolder("Complexity");
+		complex.add(this.particles, "res", 1, 4096, 1).name("Particle texture");
+		complex.add(this.lights, "shadowRes", 1, 4096, 1).name("Shadow maps");
+		complex.add(params, "add").name("Click to apply");
+
 	}
 
 	initParticles() {
@@ -354,12 +368,12 @@ class App {
 		this.scene = new RC.Scene();
 
 		this.camera = new RC.PerspectiveCamera(60, this.canvas.width / this.canvas.height, 0.1, 1000);
-		this.camera.position = new RC.Vector3(0, 0.75, 4);
+		this.camera.position = new RC.Vector3(0, 2.5, 6);
 		this.camera.lookAt(new RC.Vector3(0, 0, 0), new RC.Vector3(0, 1, 0));
 		this.PMatInv = new RC.Matrix4().getInverse(this.camera.projectionMatrix);
 		
 		this.cameraManager = new RC.CameraManager();
-		this.cameraManager.addOrbitCamera(this.camera, new RC.Vector3(0, 0.5, 0));
+		this.cameraManager.addOrbitCamera(this.camera, new RC.Vector3(0, 1.0, 0));
 		this.cameraManager.activeCamera = this.camera;
 
 
@@ -372,6 +386,7 @@ class App {
 		//this.addFrustumLight(new RC.Vector3(10, 10, 10),  new RC.Vector3(0, 0, 0), new RC.Color(1, 1, 1)).intensity = 0;
 		this.a = this.addFrustumLight(new RC.Vector3(-4, 6, -10), new RC.Vector3(0, 0, 0), new RC.Color(1, 1, 1)); //.volumeIntensity = 0;
 		this.b = this.addFrustumLight(new RC.Vector3(10, 10, 10),  new RC.Vector3(0, 0, 0), new RC.Color(1, 1, 1)); //.volumeIntensity = 0;
+		this.c = this.addFrustumLight(new RC.Vector3(6, 4, 0),  new RC.Vector3(0, 0, 0), new RC.Color(1, 0.3, 0.7)); //.volumeIntensity = 0;
 
 		// RenderCore Lights
 		// this.dLight = new RC.DirectionalLight(new RC.Color("#FFFFFF"), 1.0);
@@ -398,7 +413,7 @@ class App {
 		plane.material.side = RC.FRONT_AND_BACK_SIDE;
 
 		let pixelData = new Uint8Array([
-			230, 230, 230, 255
+			230, 230, 190, 255
 		]);
 		let texture = new RC.Texture(pixelData, RC.Texture.ClampToEdgeWrapping, RC.Texture.ClampToEdgeWrapping,
 			RC.Texture.NearestFilter, RC.Texture.NearestFilter,
@@ -984,91 +999,139 @@ class App {
 	loadResources(callback) {
 		this.manager = new RC.LoadingManager();
 		this.objLoader = new RC.ObjLoader(this.manager);
-		//this.imageLoader = new RC.ImageLoader(this.manager);
+		this.imageLoader = new RC.ImageLoader(this.manager);
 
-		this.objLoader.load("data/models/bunny.obj", (obj) => {
-			this.objects = obj;
+		let urls = [
+			"data/models/dragon.obj",
+			"data/models/bunny.obj",
+			"data/models/lucy.obj"
+		];
+		this.resources = [];
 
-			let xorshift32_state = new Uint32Array([0.4 * 0xFFFFFFFF]);
-			function xorshift32() {
-				const x = xorshift32_state;
-				x[0] ^= x[0] << 13;
-				x[0] ^= x[0] >> 17;
-				x[0] ^= x[0] << 5;
-				return x[0] / 0xFFFFFFFF;
-			}
+		for (let i = 0; i < urls.length; ++i) {
+			this.resources[i] = false;
+			this.objLoader.load(urls[i], (obj) => {
+				this.resources[i] = obj;
 
-			for (let i = 0; i < obj.length; i++) {
-				//obj[i].position.z = 0;
-
-				// Main bunny
-				//obj[i].position = new RC.Vector3(-4, 9, -19);
-				obj[i].position = new RC.Vector3(0, 0, 0);
-				obj[i].material = this.createPhongMat();
-				obj[i].material.shininess = 16;
-
-				obj[i].geometry.drawWireframe = false;
-				this.scene.add(obj[i]);
-
-				// Clone bunnies
-				const countX = 4;
-				const countZ = 4;
-				const space = 4;
-				const colors = Object.values(RC.Color.NAMES);
-
-				for (let x = -(countX-1) * space / 2; x <= (countX-1) * space / 2; x += space) {
-					for (let z = 0; z >= -(countZ-1) * space; z -= space) {
-						let clone = new RC.Mesh(obj[i].geometry, this.createPhongMat());
-						clone.position = new RC.Vector3(x, xorshift32() * 4, z + 6);
-
-						const colorCode = colors[Math.floor(xorshift32() * colors.length)];
-						clone.material.color = new RC.Color(colorCode).addScalar(0.2);
-						clone.material.specular = new RC.Color("#444444");
-						clone.material.shininess = 8;
-						this.scene.add(clone);
-					}
-				}
-			}
-
-
-			// Add shadow maps to objects
-			// TODO
-			this.sceneObjects = []
-			this.scene.traverse((object) => {
-				if (object instanceof RC.Mesh) {
-					if (object.material.programName === "custom_phong_liquid") {
-						object.material.addSBValue("NUM_FRUSTUM_LIGHTS", this.lights.frustum.length);
-
-						// Hack to use both shadow maps and normal textures
-						let maps = object.material.maps.slice(); // Use slice() to copy by value, not by reference
-						object.material.clearMaps();
-						
-						// Add shadow maps
-						for (let l of this.lights.frustum)
-							object.material.addMap(l.texture);
-
-						// Continue the hack
-						for (let m of maps)
-							object.material.addMap(m);
-					}
-					//let mat = new RC.MeshBasicMaterial();
-					let mat = new RC.CustomShaderMaterial("shadow_map");
-					mat.lights = false;
-					mat.side = object.material.side;
-					// // To prevent Peter Panning
-					// switch (object.material.side) {
-					// 	case RC.FRONT_SIDE: mat.side = RC.BACK_SIDE; break;
-					// 	case RC.BACK_SIDE: mat.side = RC.FRONT_SIDE; break;
-					// 	default: mat.side = object.material.side; break;
-					// }
-					object.material_temp = mat;
-					object.material_main = object.material;
-					this.sceneObjects.push(object);
-				}
 			});
+		}
 
-			callback();
+		let wait = (function() {
+			if (this.resources.every((el) => { return el !== false; })) {
+				this.setupResources();
+				callback();
+			} else {
+				setTimeout(wait, 500);
+			}
+		}).bind(this);
+		wait();
+	}
+
+	setupResources() {
+		let xorshift32_state = new Uint32Array([0.4 * 0xFFFFFFFF]);
+		function xorshift32() {
+			const x = xorshift32_state;
+			x[0] ^= x[0] << 13;
+			x[0] ^= x[0] >> 17;
+			x[0] ^= x[0] << 5;
+			return x[0] / 0xFFFFFFFF;
+		}
+
+		// Dragon
+		for (let obj of this.resources[0]) {
+			obj.scale.multiplyScalar(0.3);
+			obj.position = new RC.Vector3(0, 0, 0);
+			obj.material = this.createPhongMat();
+			obj.material.shininess = 16;
+
+			obj.geometry.drawWireframe = false;
+			this.scene.add(obj);
+		}
+
+		// Bunny
+		let MMatArray = [];
+		let instances = 0;
+		for (let obj of this.resources[1]) {
+			obj.position = new RC.Vector3(0, 0, 0);
+			obj.material = this.createPhongMat();
+			obj.material.shininess = 16;
+			//this.scene.add(obj);
+
+			// Clone bunnies
+			let n = 8;
+			let r = 3.5;
+			let sc = 0.9;
+			
+			for (let a = 0; a < Math.PI * 2; a += Math.PI * 2 / n) {
+				let z = Math.sin(a) * r * 0.7;
+				let x = Math.cos(a) * r;
+				let clone = new RC.Mesh(obj.geometry, this.createPhongMat());
+					clone.position = new RC.Vector3(x, 0, z);
+					clone.material.color = new RC.Color("#FFFFFF");
+					clone.material.specular = new RC.Color("#FFFFFF");
+					clone.material.shininess = 8;
+					clone.scale.multiplyScalar(sc);
+					clone.rotateY(-a + Math.PI);
+				this.scene.add(clone);
+			}
+		}
+
+		// Lucy
+		for (let obj of this.resources[2]) {
+			obj.scale.multiplyScalar(0.015);
+			obj.position = new RC.Vector3(-3.8, 0, -4.5);
+			obj.material = this.createPhongMat();
+			obj.material.shininess = 16;
+
+			// let clone = new RC.Mesh(obj.geometry, this.createPhongMat());
+			// clone.material.shininess = 16;
+			// clone.scale.multiplyScalar(0.015);
+			// clone.position = new RC.Vector3(+3.8, 0, -4.5);
+			// clone.scale.x *= -1;
+
+			this.scene.add(obj);
+			// this.scene.add(clone);
+		}
+	}
+
+	start() {
+		// Add shadow maps to objects
+		this.sceneObjects = []
+		this.scene.traverse((object) => {
+			if (object instanceof RC.Mesh) {
+				if (object.material.programName === "custom_phong_liquid") {
+					object.material.addSBValue("NUM_FRUSTUM_LIGHTS", this.lights.frustum.length);
+
+					// Hack to use both shadow maps and normal textures
+					let maps = object.material.maps.slice(); // Use slice() to copy by value, not by reference
+					object.material.clearMaps();
+					
+					// Add shadow maps
+					for (let l of this.lights.frustum)
+						object.material.addMap(l.texture);
+
+					// Continue the hack
+					for (let m of maps)
+						object.material.addMap(m);
+				}
+
+				let mat = new RC.CustomShaderMaterial("shadow_map");
+				mat.lights = false;
+				mat.side = object.material.side;
+				// // To prevent Peter Panning
+				// switch (object.material.side) {
+				// 	case RC.FRONT_SIDE: mat.side = RC.BACK_SIDE; break;
+				// 	case RC.BACK_SIDE: mat.side = RC.FRONT_SIDE; break;
+				// 	default: mat.side = object.material.side; break;
+				// }
+				object.material_temp = mat;
+				object.material_main = object.material;
+				this.sceneObjects.push(object);
+			}
 		});
+
+		// Begin animation
+		window.requestAnimationFrame(() => { this.update(); });
 	}
 
 	update() {
