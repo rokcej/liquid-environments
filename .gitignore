@@ -1,4 +1,4 @@
-data/
+data/models/
 rendercore/
 START_SERVER.*
 .vscode/
