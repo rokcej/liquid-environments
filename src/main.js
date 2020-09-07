@@ -10,13 +10,16 @@ class App {
 		this.renderer.clearColor = "#000000FF";
 		this.renderer.addShaderLoaderUrls("rendercore/src/shaders");
 		this.renderer.addShaderLoaderUrls("src/shaders");
-		
+		// GL
 		this.gl = this.renderer._gl;
-
+		// Input
 		this.keyboardInput = RC.KeyboardInput.instance;
 		this.mouseInput = RC.MouseInput.instance;
 		this.mouseInput.setSourceObject(this.canvas);
 
+		// Init
+		this.setLoading(true); // Loading message
+		// 
 		this.initSettings();
 		this.initGUI();
 		this.initParticles();
@@ -24,9 +27,9 @@ class App {
 		this.initScene();
 		this.initRenderQueue();
 		this.resize();
-
 		window.addEventListener("resize", () => { this.resize(); }, false);
 
+		// Load resources and start
 		this.loadResources(() => { this.start(); });
 		//window.requestAnimationFrame(() => { this.update(); });
 	}
@@ -1212,27 +1215,35 @@ class App {
 		this.camera.updateMatrixWorld();
 		this.camera.matrixWorldInverse.getInverse(this.camera.matrixWorld);
 
-		//this.renderer.render(this.scene, this.camera);
-		this.renderQueue.render();
+		// So RenderCore doesn't spam the console when loading shaders
+		if (this.renderer._loadRequiredPrograms()) {
 
-		if (this.renderer.succeeded) {
-			if (this.airlightLookupRendered === undefined) {
-				this.renderQueue.removeRenderPass(this.airlightLookupPass);
-				this.airlightLookupRendered = true;
+			this.renderQueue.render();
+
+			if (this.renderer.succeeded) {
+				this.setLoading(false);
+
+				if (this.airlightLookupRendered === undefined) {
+					this.renderQueue.removeRenderPass(this.airlightLookupPass);
+					this.airlightLookupRendered = true;
+				}
+
+				// Swap WebGL textures
+				let glmap = this.renderer._glManager._textureManager._cached_textures;
+				let tex1 = glmap.get(this.particles.texture[0]);
+				let tex2 = glmap.get(this.particles.texture[1]);
+				glmap.set(this.particles.texture[0], tex2);
+				glmap.set(this.particles.texture[1], tex1);
+
+				// // Swap RenderCore textures
+				// let map = this.renderQueue._textureMap;
+				// let temp = map.particlesRead;
+				// map.particlesRead = map.particlesWrite;
+				// map.particlesWrite = temp;
+			} else {
+				this.setLoading(true);
 			}
 
-			// Swap WebGL textures
-			let glmap = this.renderer._glManager._textureManager._cached_textures;
-			let tex1 = glmap.get(this.particles.texture[0]);
-			let tex2 = glmap.get(this.particles.texture[1]);
-			glmap.set(this.particles.texture[0], tex2);
-			glmap.set(this.particles.texture[1], tex1);
-
-			// // Swap RenderCore textures
-			// let map = this.renderQueue._textureMap;
-			// let temp = map.particlesRead;
-			// map.particlesRead = map.particlesWrite;
-			// map.particlesWrite = temp;
 		}
 	}
 
@@ -1274,6 +1285,13 @@ class App {
 		// DOF focus
 		this.dof.focus.x = Math.trunc(this.canvas.width / 2.0);
 		this.dof.focus.y = Math.trunc(this.canvas.height / 2.0);
+	}
+
+	setLoading(isLoading) {
+		if (isLoading !== this.isLoading) {
+			document.getElementById("loading").style.display = isLoading ? "block" : "none";
+			this.isLoading = isLoading;
+		}
 	}
 }
 
