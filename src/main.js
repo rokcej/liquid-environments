@@ -1198,6 +1198,10 @@ class App {
 		};
 		this.cameraManager.update(input, this.timer.delta * 1000);
 
+		// Move light
+		this.lights.frustum[0].camera.position.x = -6 + 3 * Math.sin(this.timer.curr * 0.5);
+		this.lights.frustum[0].camera.lookAt(new RC.Vector3(0, 0, 0), new RC.Vector3(0, 1, 0));
+
 		// Render
 		this.render();
 		window.requestAnimationFrame(() => { this.update(); });
