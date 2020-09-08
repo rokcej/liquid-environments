@@ -1179,13 +1179,13 @@ class App {
 				// Unbind the framebuffer
 				this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
 
-				this.dof.v0_target = Math.min(pixel[0], this.dof.f * 0.9);
+				this.dof.v0_target = Math.max(Math.min(pixel[0], this.dof.f * 0.9), 0.0);
 				this.dof.lastUpdate = this.timer.curr;
 			}
 		}
 		let diff = this.dof.v0 - this.dof.v0_target;
 		if (Math.abs(diff) > 0.00001);
-			this.dof.v0 -= diff * this.timer.delta * 2.0;
+			this.dof.v0 -= diff * Math.min(this.timer.delta * 2.0, 1.0);
 
 
 		// Camera
