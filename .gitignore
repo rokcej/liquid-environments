@@ -1,4 +1,6 @@
-data/models/
-rendercore/
+data/models/raw/
+rendercore/examples/
+rendercore/.git/
+rendercore/.gitignore
 START_SERVER.*
 .vscode/
