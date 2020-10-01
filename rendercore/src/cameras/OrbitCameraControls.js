@@ -82,7 +82,7 @@ export class OrbitCameraControls {
 	 * @returns
 	 */
 	_getZoomScale(deltaT) {
-		return Math.pow(0.95, this._zoomSpeed * deltaT * 0.1);
+		return Math.pow(0.95, this._zoomSpeed);
 	}
 
 	/**
