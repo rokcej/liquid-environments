@@ -1,6 +1,8 @@
 # Real-time Rendering of Liquid Environments
 
-This project was developed for my Bachelor's thesis. A live demo of the application is available [here](https://rokcej.github.io/).
+This project was developed for my Bachelor's thesis, which can be accessed [here](https://repozitorij.uni-lj.si/IzpisGradiva.php?id=119972&lang=eng).
+
+A live demo of the application is available [here](https://rokcej.github.io/).
 
 ## Abstract 
 
