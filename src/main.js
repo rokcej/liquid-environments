@@ -31,9 +31,9 @@ class App {
 
 		// Load resources and start
 		this.loadResources(() => { this.start(); });
-		//window.requestAnimationFrame(() => { this.update(); });
 	}
 
+	// Initialize effect parameters and program settings
 	initSettings() {
 		// Params
 		const urlParams = new URLSearchParams(window.location.search);
@@ -118,6 +118,7 @@ class App {
 		}
 	}
 
+	// Create GUI
 	initGUI() {
 		let params = {
 			fcol: this.fog.color.clone().multiplyScalar(255).toArray(),
@@ -200,6 +201,7 @@ class App {
 
 	}
 
+	// Create ping-pong textures for particle simulation
 	initParticles() {
 		let sz = this.particles.res;
 		let n_comp = this.particles.components;
@@ -260,6 +262,7 @@ class App {
 		this.particles.scene.add(this.particles.mesh);
 	}
 
+	// Create base mesh for light volumes
 	initLightVolumes() {
 		// Frustum geometry
 		let sz = this.lights.shadowRes;
@@ -314,6 +317,7 @@ class App {
 		//this.lights.frustumGeo.drawWireframe = true;
 	}
 
+	// Add a volumetric light to the scene
 	addFrustumLight(position, target, color) {
 		if (position === undefined) position = new RC.Vector3(0, 0, 0);
 		if (target === undefined) target = new RC.Vector3(0, 0, -1).add(position);
@@ -354,6 +358,7 @@ class App {
 		return l;
 	}
 
+	// Create a custom phong material
 	createPhongMat(color, specular, shininess) {
 		if (color === undefined) color = new RC.Color(1, 1, 1);
 		if (specular === undefined) specular = new RC.Color(1, 1, 1);
@@ -366,6 +371,7 @@ class App {
 		return mat;
 	}
 
+	// Create scene with basic objects and lights
 	initScene() {
 		/// Main scene
 		this.scene = new RC.Scene();
@@ -381,40 +387,19 @@ class App {
 
 
 		// Volumetric lights
-		//this.addFrustumLight(new RC.Vector3(-4, 10, -20), new RC.Vector3(0, 0, 0), new RC.Color(0.8, 0.8, 0.2)).intensity = 0.7;
-		//this.addFrustumLight(new RC.Vector3(10, 10, 10),  new RC.Vector3(0, 0, 0), new RC.Color(1.0, 0.2, 0.5)).intensity = 0.9;
-		//this.addFrustumLight(new RC.Vector3(20, 40, -8),  new RC.Vector3(0, 0, 0), new RC.Color(0.9, 0.85, 1.0)).intensity = 1.8;
-		//this.lights.frustum[2].volumeIntensity = 8000.0
-
-		//this.addFrustumLight(new RC.Vector3(10, 10, 10),  new RC.Vector3(0, 0, 0), new RC.Color(1, 1, 1)).intensity = 0;
-		this.a = this.addFrustumLight(new RC.Vector3(-4, 6, -10), new RC.Vector3(0, 0, 0), new RC.Color(1, 1, 1)); //.volumeIntensity = 0;
-		this.b = this.addFrustumLight(new RC.Vector3(10, 10, 10),  new RC.Vector3(0, 0, 0), new RC.Color(1, 1, 1)); //.volumeIntensity = 0;
-		this.c = this.addFrustumLight(new RC.Vector3(6, 4, 0),  new RC.Vector3(0, 0, 0), new RC.Color(1, 0.3, 0.7)); //.volumeIntensity = 0;
+		this.light1 = this.addFrustumLight(new RC.Vector3(-4, 6, -10), new RC.Vector3(0, 0, 0), new RC.Color(1, 1, 1)); //.volumeIntensity = 0;
+		this.light2 = this.addFrustumLight(new RC.Vector3(10, 10, 10),  new RC.Vector3(0, 0, 0), new RC.Color(1, 1, 1)); //.volumeIntensity = 0;
+		this.light3 = this.addFrustumLight(new RC.Vector3(6, 4, 0),  new RC.Vector3(0, 0, 0), new RC.Color(1, 0.3, 0.7)); //.volumeIntensity = 0;
 
 		// RenderCore Lights
-		// this.dLight = new RC.DirectionalLight(new RC.Color("#FFFFFF"), 1.0);
-		// this.dLight.position = new RC.Vector3(1.0, 0.5, 0.8);
-
-		// this.pLight = new RC.PointLight(new RC.Color("#FFFFFF"), 1.0);
-		// this.pLight.position = new RC.Vector3(-4.0, 10.0, -20.0);
-		// this.pLight2 = new RC.PointLight(new RC.Color("#FFFFFF"), 1.0);
-		// this.pLight2.position = new RC.Vector3(10.0, 10.0, 10.0);
 		this.aLight = new RC.AmbientLight(new RC.Color("#FFFFFF"), 0.03);
-
-		//this.pLight.add(new RC.Cube(1.0, this.pLight.color));
-		//this.pLight2.add(new RC.Cube(1.0, this.pLight.color));
-
-		this.lightsRC = [/*this.pLight, this.pLight2,*/ this.aLight]; // , this.dLight];
+		this.lightsRC = [this.aLight];
 		for (let l of this.lightsRC)
 			this.scene.add(l);
-		// for (let l of this.lights)
-		// 	this.particleScene.add(l);
 
-
-		// Plane
+		// Floor plane
 		let plane = new RC.Quad({x: -64, y: 64}, {x: 64, y: -64}, this.createPhongMat());
 		plane.material.side = RC.FRONT_AND_BACK_SIDE;
-
 		let pixelData = new Uint8Array([
 			230, 230, 190, 255
 		]);
@@ -424,37 +409,18 @@ class App {
 
 		plane.translateY(0);
 		plane.rotateX(-Math.PI * 0.5);
-
 		plane.material.addMap(texture);
 		this.scene.add(plane);
 
+		// Wall plane
 		let plane2 = new RC.Quad({x: -64, y: 64}, {x: 64, y: -64}, this.createPhongMat());
 		plane2.material.side = RC.FRONT_AND_BACK_SIDE;
 		//plane2.material.addMap(texture);
 		plane2.translateZ(-35);
-		
 		this.scene.add(plane2);
-
-
-		// Display particle textures
-		let q1 = new RC.Quad({x: -1, y: -.5}, {x: 1, y: .5}, new RC.MeshBasicMaterial());
-		q1.position = new RC.Vector3(-3,0,-2);
-		q1.material.side = RC.Material.FRONT_AND_BACK_SIDE;
-		q1.material.color = new RC.Color("#FFFFFF");
-		q1.material.addMap(this.particles.texture[0]);
-		//this.scene.add(q1);
-
-		let q2 = new RC.Quad({x: -1, y: -.5}, {x: 1, y: .5}, new RC.MeshBasicMaterial());
-		q2.position = new RC.Vector3(3,0,-2);
-		q2.material.side = RC.Material.FRONT_AND_BACK_SIDE;
-		q2.material.color = new RC.Color("#FFFFFF");
-		q2.material.addMap(this.particles.texture[1]);
-		//this.scene.add(q2);
-
-		this.q1 = q1;
-		this.q2 = q2;
 	}
 
+	// Setup render passes
 	initRenderQueue() {
 
 		let RGBA16F_LINEAR = {
@@ -462,12 +428,12 @@ class App {
 			wrapT: RC.Texture.ClampToEdgeWrapping,
 			minFilter: RC.Texture.LinearFilter,
 			magFilter: RC.Texture.LinearFilter,
-			internalFormat: RC.Texture.RGBA16F, // WASTE OF MEMORY!!!
+			internalFormat: RC.Texture.RGBA16F,
 			format: RC.Texture.RGBA,
 			type: RC.Texture.FLOAT
 		};
 
-		// NOISE
+		// NOISE (Generate Perlin noise texture)
 		this.perlinNoisePass = new RC.RenderPass(
 			RC.RenderPass.POSTPROCESS,
 			(textureMap, additionalData) => {},
@@ -492,7 +458,7 @@ class App {
 				{ id: "perlinNoise", textureConfig: RGBA16F_LINEAR}
 			]
 		);
-		// PARTICLES UPDATE
+		// PARTICLES UPDATE (Simulate particle movement)
 		this.particleUpdatePass = new RC.RenderPass(
 			RC.RenderPass.POSTPROCESS,
 			(textureMap, additionalData) => {},
@@ -529,7 +495,7 @@ class App {
 				}
 			}]
 		);
-		// PARTICLES DRAW
+		// PARTICLES DRAW (Draw particles)
 		this.particleDrawPass = new RC.RenderPass(
 			RC.RenderPass.BASIC,
 			(textureMap, additionalData) => {
@@ -559,9 +525,6 @@ class App {
 				this.particles.mesh.material.setUniform("a", this.dof.a);
 				this.particles.mesh.material.setUniform("v0", this.dof.v0);
 
-				// for (let l of this.lights)
-				// 	this.particleScene.add(l);
-
 				return { scene: this.particles.scene, camera: this.camera };
 			},
 			RC.RenderPass.TEXTURE,
@@ -572,7 +535,7 @@ class App {
 				textureConfig: RC.RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG
 			}]
 		);
-		// SHADOW MAP
+		// SHADOW MAP (Generate shadow maps for each light)
 		this.shadowMapPasses = [];
 		for (let i = 0; i < this.lights.frustum.length; ++i) {
 			this.shadowMapPasses.push(new RC.RenderPass(
@@ -594,7 +557,7 @@ class App {
 				]
 			));
 		}
-		// MAIN
+		// MAIN (Main render)
 		this.mainRenderPass = new RC.RenderPass(
 			RC.RenderPass.BASIC,
 			(textureMap, additionalData) => {},
@@ -620,8 +583,6 @@ class App {
 					let light = this.lights.frustum[i];
 
 					let lightMatrix = new RC.Matrix4().multiplyMatrices(light.camera.projectionMatrix, light.camera.matrixWorldInverse);
-					// // Apply light intensity
-					// let lightColor = new RC.Vector3().copy(light.color).multiplyScalar(light.intensity);
 					// Light position in view space
 					let lightPos = new RC.Vector3().copy(light.camera.position).applyMatrix4(this.camera.matrixWorldInverse);
 					let lightColor = new RC.Color().copy(light.color).multiplyScalar(light.intensity);
@@ -644,9 +605,6 @@ class App {
 					this.particles.mesh.material.setUniform(prefix + "worldHeight", light.camera.position.y);
 				}
 
-				// for (let l of this.lights)
-				// 	this.scene.add(l);
-
 				return { scene: this.scene, camera: this.camera };
 			},
 			RC.RenderPass.TEXTURE,
@@ -656,7 +614,7 @@ class App {
 				{ id: "mainColor", textureConfig: RC.RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG }
 			]
 		);
-		// AIRLIGHT LOOKUP
+		// AIRLIGHT LOOKUP (Calculate lookup texture for volumetric lights)
 		this.airlightLookupPass = new RC.RenderPass(
 			RC.RenderPass.POSTPROCESS,
 			(textureMap, additionalData) => {},
@@ -674,7 +632,7 @@ class App {
 				{ id: "airlightLookup", textureConfig: RGBA16F_LINEAR }
 			]
 		);
-		// LIGHT VOLUME
+		// LIGHT VOLUME (Render light volumes)
 		this.lightVolumePasses = [];
 		for (let i = 0; i < this.lights.frustum.length; ++i) {
 			let light = this.lights.frustum[i];
@@ -737,7 +695,7 @@ class App {
 				{ id: "lightVolume", textureConfig: RGBA16F_LINEAR }
 			]
 		);
-		// DEPTH
+		// DEPTH (Linearize and correct depth buffer)
 		this.depthPass = new RC.RenderPass(
 			RC.RenderPass.POSTPROCESS,
 			(textureMap, additionalData) => {},
@@ -763,7 +721,7 @@ class App {
 				{ id: "mainDepthDist", textureConfig: RGBA16F_LINEAR }
 			]
 		);
-		// DOF
+		// DOF (Apply depth of field effect)
 		this.dofDownsamplePass = new RC.RenderPass(
 			RC.RenderPass.POSTPROCESS,
 			(textureMap, additionalData) => {},
@@ -848,7 +806,7 @@ class App {
 				{ id: "dof", textureConfig: RGBA16F_LINEAR }
 			]
 		);
-		// GAUSS
+		// GAUSS (Apply Gaussian blur to texture)
 		this.gaussPassVert = [];
 		this.gaussPassHor  = [];
 		for (let iPass = 0; iPass < this.dof.numPasses; ++iPass) {
@@ -889,7 +847,7 @@ class App {
 				]
 			));
 		}
-		// WATER
+		// WATER (Add light scattering and extinction to main render)
 		this.waterRenderPass = new RC.RenderPass(
 			RC.RenderPass.POSTPROCESS,
 			(textureMap, additionalData) => {},
@@ -922,7 +880,7 @@ class App {
 			]
 		);
 
-		// POST
+		// POST (Merge depth of field and particles)
 		this.postPass = new RC.RenderPass(
 			RC.RenderPass.POSTPROCESS,
 			(textureMap, additionalData) => {},
@@ -944,7 +902,7 @@ class App {
 				{ id: "final", textureConfig: RC.RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG }
 			]
 		);
-		// DISPLAY
+		// DISPLAY (Display final result to screen)
 		this.displayPass = new RC.RenderPass(
 			RC.RenderPass.POSTPROCESS,
 			(textureMap, additionalData) => {},
@@ -960,8 +918,9 @@ class App {
     		{ width: this.canvas.width, height: this.canvas.height }
 		);
 
+		// Create render queue
 		this.renderQueue = new RC.RenderQueue(this.renderer);
-
+		// Add render passes to the queue (order is important)
 		this.renderQueue.addTexture("particlesRead", this.particles.texture[0]);
 		this.renderQueue.addTexture("particlesWrite", this.particles.texture[1]);
 		for (let i = 0; i < this.lights.frustum.length; ++i)
@@ -999,6 +958,7 @@ class App {
 		this.renderQueue.pushRenderPass(this.displayPass);
 	}
 
+	// Download objects
 	loadResources(callback) {
 		this.manager = new RC.LoadingManager();
 		this.objLoader = new RC.ObjLoader(this.manager);
@@ -1030,16 +990,8 @@ class App {
 		wait();
 	}
 
+	// Add objects to the scene after they are loaded
 	setupResources() {
-		let xorshift32_state = new Uint32Array([0.4 * 0xFFFFFFFF]);
-		function xorshift32() {
-			const x = xorshift32_state;
-			x[0] ^= x[0] << 13;
-			x[0] ^= x[0] >> 17;
-			x[0] ^= x[0] << 5;
-			return x[0] / 0xFFFFFFFF;
-		}
-
 		// Dragon
 		for (let obj of this.resources[0]) {
 			obj.scale.multiplyScalar(0.3);
@@ -1058,7 +1010,6 @@ class App {
 			obj.position = new RC.Vector3(0, 0, 0);
 			obj.material = this.createPhongMat();
 			obj.material.shininess = 16;
-			//this.scene.add(obj);
 
 			// Clone bunnies
 			let n = 8;
@@ -1086,17 +1037,11 @@ class App {
 			obj.material = this.createPhongMat();
 			obj.material.shininess = 16;
 
-			// let clone = new RC.Mesh(obj.geometry, this.createPhongMat());
-			// clone.material.shininess = 16;
-			// clone.scale.multiplyScalar(0.015);
-			// clone.position = new RC.Vector3(+3.8, 0, -4.5);
-			// clone.scale.x *= -1;
-
 			this.scene.add(obj);
-			// this.scene.add(clone);
 		}
 	}
 
+	// Begin the animation loop
 	start() {
 		// Add shadow maps to objects
 		this.sceneObjects = []
@@ -1121,12 +1066,6 @@ class App {
 				let mat = new RC.CustomShaderMaterial("shadow_map");
 				mat.lights = false;
 				mat.side = object.material.side;
-				// // To prevent Peter Panning
-				// switch (object.material.side) {
-				// 	case RC.FRONT_SIDE: mat.side = RC.BACK_SIDE; break;
-				// 	case RC.BACK_SIDE: mat.side = RC.FRONT_SIDE; break;
-				// 	default: mat.side = object.material.side; break;
-				// }
 				object.material_temp = mat;
 				object.material_main = object.material;
 				this.sceneObjects.push(object);
@@ -1137,6 +1076,7 @@ class App {
 		window.requestAnimationFrame(() => { this.update(); });
 	}
 
+	// Main update function
 	update() {
 		// Timer
 		this.timer.prev = this.timer.curr;
@@ -1210,16 +1150,19 @@ class App {
 		window.requestAnimationFrame(() => { this.update(); });
 	}
 
+	// Main render function
 	render() {
 		// For some reason I have to manually do this?????
 		this.camera.updateMatrixWorld();
 		this.camera.matrixWorldInverse.getInverse(this.camera.matrixWorld);
 
 		// So RenderCore doesn't spam the console when loading shaders
+		// Check if shaders are being loaded
 		if (this.renderer._loadRequiredPrograms()) {
 
 			this.renderQueue.render();
 
+			// Check if render was successful
 			if (this.renderer.succeeded) {
 				this.setLoading(false);
 
@@ -1228,18 +1171,12 @@ class App {
 					this.airlightLookupRendered = true;
 				}
 
-				// Swap WebGL textures
+				// Swap WebGL textures for particle simulation
 				let glmap = this.renderer._glManager._textureManager._cached_textures;
 				let tex1 = glmap.get(this.particles.texture[0]);
 				let tex2 = glmap.get(this.particles.texture[1]);
 				glmap.set(this.particles.texture[0], tex2);
 				glmap.set(this.particles.texture[1], tex1);
-
-				// // Swap RenderCore textures
-				// let map = this.renderQueue._textureMap;
-				// let temp = map.particlesRead;
-				// map.particlesRead = map.particlesWrite;
-				// map.particlesWrite = temp;
 			} else {
 				this.setLoading(true);
 			}
@@ -1247,6 +1184,7 @@ class App {
 		}
 	}
 
+	// Callback function on window resize
 	resize() {
 		// Resize canvas
 		this.canvas.width  = window.innerWidth;
@@ -1287,6 +1225,7 @@ class App {
 		this.dof.focus.y = Math.trunc(this.canvas.height / 2.0);
 	}
 
+	// Show or hide UI loading message
 	setLoading(isLoading) {
 		if (isLoading !== this.isLoading) {
 			document.getElementById("loading").style.display = isLoading ? "block" : "none";
@@ -1296,6 +1235,7 @@ class App {
 }
 
 
+// Starting point, run the app
 document.addEventListener("DOMContentLoaded", () => {
 	const canvas = document.getElementById("canvas");
 	const app = new App(canvas);
